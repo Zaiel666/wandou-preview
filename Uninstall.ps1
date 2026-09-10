@@ -1,8 +1,8 @@
-$ErrorActionPreference='Stop'
+﻿$ErrorActionPreference='Stop'
 $app=Join-Path $env:LOCALAPPDATA 'C4DQuickPreview'
 $stateFile=Join-Path $app 'registry-backup.json'
 if(-not(Test-Path -LiteralPath $stateFile)){Write-Host 'No installation backup found; nothing changed.';exit 0}
-$backup=@(Get-Content -LiteralPath $stateFile -Raw | ConvertFrom-Json)
+$backup=Get-Content -LiteralPath $stateFile -Raw | ConvertFrom-Json
 foreach($entry in $backup){
     if(-not($entry.Path -like 'Software\Classes\*' -or $entry.Path -eq 'Software\C4DQuickPreview')){throw 'Unexpected registry path in backup.'}
     $key=[Microsoft.Win32.Registry]::CurrentUser.OpenSubKey($entry.Path,$true)

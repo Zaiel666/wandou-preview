@@ -1,4 +1,4 @@
-param([string]$Cinema4DPath)
+﻿param([string]$Cinema4DPath)
 $ErrorActionPreference='Stop'
 if(-not [Environment]::Is64BitProcess){throw 'Please run the 64-bit Windows PowerShell.'}
 $app=Join-Path $env:LOCALAPPDATA 'C4DQuickPreview'
@@ -42,7 +42,7 @@ $changes=@(
 $extensionKey=[Microsoft.Win32.Registry]::ClassesRoot.OpenSubKey('.c4d')
 if($extensionKey){$progId=$extensionKey.GetValue('');$extensionKey.Close();if($progId){$changes+=@{Path="Software\Classes\$progId\shellex\{e357fccd-a995-4576-b01f-234630154e96}";Name='';Value=$clsid}}}
 $backup=@()
-if(Test-Path -LiteralPath $stateFile){$backup=@(Get-Content -LiteralPath $stateFile -Raw | ConvertFrom-Json)}
+if(Test-Path -LiteralPath $stateFile){$backup=Get-Content -LiteralPath $stateFile -Raw | ConvertFrom-Json}
 foreach($change in $changes){
     $prior=@($backup | Where-Object {$_.Path -eq $change.Path -and $_.Name -eq $change.Name})
     if($prior.Count){if($prior[0].Installed -ne $change.Value){throw 'An installation with a different backend already exists. Uninstall it first.'};continue}

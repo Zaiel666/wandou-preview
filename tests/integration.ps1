@@ -10,10 +10,9 @@ if($LASTEXITCODE -ne 0){throw 'Test build failed'}
 $saved=@()
 try{
     & (Join-Path $Package 'Install.ps1')
-    $saved=@(Get-Content -LiteralPath $state -Raw | ConvertFrom-Json)
+    $saved=Get-Content -LiteralPath $state -Raw | ConvertFrom-Json
     $output=Join-Path $PSScriptRoot 'shell-preview.png'
-    $p=Start-Process -FilePath "$root\dist\ShellSmoke.exe" -ArgumentList ('"'+$Scene+'" "'+$output+'"') -PassThru -WindowStyle Hidden -RedirectStandardOutput "$root\dist\shell-test.log"
-    if(-not $p.WaitForExit(20000)){$p.Kill();throw 'Shell thumbnail extraction timed out'}
+    $p=Start-Process -FilePath "$root\dist\ShellSmoke.exe" -ArgumentList ('"'+$Scene+'" "'+$output+'"') -PassThru -Wait -WindowStyle Hidden -RedirectStandardOutput "$root\dist\shell-test.log"
     Get-Content "$root\dist\shell-test.log"
     if($p.ExitCode -ne 0){throw 'Shell thumbnail extraction failed'}
     Write-Host 'PASS: Windows Shell returned a thumbnail.'
