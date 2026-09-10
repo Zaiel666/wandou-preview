@@ -1,0 +1,9 @@
+dist/
+tests/*.png
+tests/*.error.txt
+*.obj
+*.lib
+*.exp
+*.pdb
+backend.txt
+.vs/
