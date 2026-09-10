@@ -1,7 +1,7 @@
 $ErrorActionPreference='Stop'
 $root=Split-Path $PSScriptRoot -Parent
 $dist=Join-Path $root 'dist'
-$stage=Join-Path $dist 'Model-QuickPreview-0.2.0-Windows-x64'
+$stage=Join-Path $dist 'Wandou-Preview-0.1.0-Windows-x64'
 New-Item -ItemType Directory -Force -Path $stage | Out-Null
 Get-ChildItem -LiteralPath $dist -File | Where-Object {$_.Extension -in @('.exe','.dll')} | Copy-Item -Destination $stage -Force
 Copy-Item -LiteralPath (Join-Path $root 'assets\metal-cube.ico') -Destination $stage -Force
@@ -12,4 +12,4 @@ foreach($name in @('Install.ps1','Uninstall.ps1')){
 }
 foreach($name in @('Install.cmd','Uninstall.cmd','README.md','LICENSE','THIRD-PARTY-NOTICES.md')){Copy-Item -LiteralPath (Join-Path $root $name) -Destination $stage -Force}
 Copy-Item -LiteralPath (Join-Path $root 'docs') -Destination $stage -Recurse -Force
-Compress-Archive -Path $stage -DestinationPath (Join-Path $dist 'Model-QuickPreview-0.2.0-Windows-x64.zip') -Force
+Compress-Archive -Path $stage -DestinationPath (Join-Path $dist 'Wandou-Preview-0.1.0-Windows-x64.zip') -Force

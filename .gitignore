@@ -3,6 +3,7 @@ build/
 vendor-cache/
 tests/*.png
 tests/*.error.txt
+tests/*.tmp
 tests/local/
 tests/model-output/
 *.obj

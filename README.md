@@ -1,58 +1,51 @@
-# 3D 模型快速预览 · Model Quick Preview
+# 豌豆预览 · Wandou Preview
 
-Windows 10/11 x64 的文件夹三维模型缩略图和右键交互预览工具。它不占用空格键，因此可以和 QuickLook 同时使用。
+**Windows 10/11 x64 文件夹模型缩略图与右键预览工具，当前版本 0.1.0。**
 
-![金属立方体图标](assets/metal-cube-preview.png)
+它让资源管理器直接显示 FBX、OBJ 等三维模型缩略图。右键模型选择 **3D 模型快速预览**，无需先打开 Blender、C4D、3ds Max 或 Maya。软件不占用空格键，可以和 QuickLook 同时使用。
 
-## 0.2.0 提供的功能
+![豌豆预览金属立方体图标](assets/metal-cube-preview.png)
 
-- 文件资源管理器直接显示通用三维模型缩略图，左下角标注 FBX、OBJ、GLB 等文件格式。
-- 右键模型 → **3D 模型快速预览**，金属立方体图标用于辨认菜单项。
-- 左键拖动旋转，中键或右键拖动平移，滚轮缩放，双击或按 `Home`/`R` 恢复视角，`Esc` 退出。
-- C4D 文件继续显示场景保存时的图片；C4D 图片不含几何数据，因此窗口内只能缩放和平移。
-- 通用模型读取和渲染完全独立运行，不需要安装 Blender、3ds Max、Maya 或其 SDK。
-- 缩略图实际解析在受限工作进程中运行，20 秒超时、最大约 1 GiB 内存，避免损坏模型直接拖垮资源管理器。
-- 每用户安装，不修改默认打开软件，也不注册全局快捷键。卸载会恢复安装前的缩略图关联。
+## 功能
 
-## 直接支持的常用格式
+- 资源管理器直接显示三维模型缩略图，左下角标注 FBX、OBJ、GLB 等文件格式。
+- 右键打开独立三维窗口：左键旋转，中键或右键平移，滚轮缩放，双击或按 `Home`/`R` 恢复视角。
+- C4D 文件显示场景保存时的图片，左下角显示 C4D；需要电脑已安装带缩略图组件的 Cinema 4D。
+- Illustrator `.ai` 文件保存了 PDF 兼容数据时，可直接生成缩略图和右键预览，不要求安装 Illustrator。
+- 金属立方体图标显示在右键菜单和程序窗口中。
+- 每用户安装，不需要管理员权限，不修改默认打开软件，不上传文件。
+- 模型解析在独立工作进程中运行，有 20 秒和约 1 GiB 内存上限，避免异常文件拖住资源管理器。
 
-主要格式：FBX、OBJ、3DS、3MF、COLLADA/DAE、DXF、glTF/GLB、STL、PLY、DirectX X、X3D、IFC、LightWave、Modo、OpenGEX、USD/USDZ 等。
+## 支持格式
 
-安装器还为 Assimp 当前导入器包含的 AC/AC3D、ASE、B3D、BVH、COB、CSM、IQM、Irrlicht、M3D、MD2/MD3/MD5、MS3D、NDO、NFF、OFF、PMX、Quick3D、RAW、SCN、SIB、SMD、STEP、TER、UC、VTA、XGL、ZGL 等扩展名注册缩略图和右键预览。格式名被注册不代表任意版本、任意插件数据都能完整还原；窗口目前以静态网格和基础材质颜色为主。
+通用三维格式：`.fbx`、`.obj`、`.3ds`、`.3mf`、`.dae`、`.dxf`、`.gltf`、`.glb`、`.stl`、`.ply`、`.ifc`、`.lwo`、`.lws`、`.lxo`、`.stp`、`.usd`、`.usda`、`.usdc`、`.usdz`、`.x`、`.x3d`、`.x3db`。
 
-以下图三格式在 0.2.0 中**没有注册为可预览**：Alembic `.abc`、Bullet `.bullet`、Forger `.fpk`、Illustrator `.ai`、Redshift Proxy `.rs`、OpenVDB `.vdb`、VRML `.wrl`。它们需要额外解析器或专有格式支持；普通 `.xml` 也没有全局注册，因为会错误接管大量非三维 XML 文件。
+专用图片预览：`.c4d`、`.ai`。
 
-Blender `.blend` 不使用通用几何导入：Assimp 已弃用该格式支持。后续会采用 Blender 文件内置缩略图提取，避免假装能完整解析场景。
+通用模型窗口重点显示静态网格和基础材质颜色。动画、程序化材质、第三方渲染器节点及部分贴图不会完整还原。Blender `.blend` 不是稳定的独立交换格式；请从 Blender 导出 FBX、OBJ 或 GLB 后预览。
 
 ## 安装
 
-1. 在 [Releases](https://github.com/Zaiel666/c4d-quick-preview/releases) 下载 `Model-QuickPreview-0.2.0-Windows-x64.zip`，不要下载 GitHub 自动生成的 Source code。
+1. 在 [Releases](https://github.com/Zaiel666/wandou-preview/releases) 下载唯一的 `Wandou-Preview-0.1.0-Windows-x64.zip`。
 2. 完整解压 ZIP。
-3. 双击 `Install.cmd`。安装器会自动卸载本项目旧的 0.1.0 注册，再安装新版。
-4. 重新打开模型所在文件夹，切换为“大图标”或“超大图标”。
-5. 右键模型选择“3D 模型快速预览”。Windows 11 可能需要进入“显示更多选项”。
+3. 双击 `Install.cmd`。
+4. 重新打开模型文件夹，切换为“大图标”或“超大图标”。
+5. 右键模型选择“3D 模型快速预览”。Windows 11 可能需要先点“显示更多选项”。
 
-安装包目前没有商业代码签名证书，Windows 可能显示来源提示。发布页提供 SHA-256 校验值。
-
-详细说明见 [安装与使用](docs/安装与使用.md)，已完成的检查见 [测试记录](docs/测试记录.md)。
+旧的 C4D Quick Preview 安装会自动迁移。详细排错和卸载方法见 [安装与使用](docs/安装与使用.md)。
 
 ## C4D 说明
 
-通用模型功能不依赖 C4D。若电脑装有带 `resource\libs\win64\win_thumbnail.dll` 的 Cinema 4D，安装器会自动启用 `.c4d` 场景图片缩略图；也可以在 PowerShell 中指定：
+安装器会自动寻找 `resource\libs\win64\win_thumbnail.dll`。也可手动指定 Cinema 4D 目录：
 
 ```powershell
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Install.ps1 -Cinema4DPath "D:\Maxon Cinema 4D 2023"
 ```
 
-本项目不打包、不上传 Maxon 的 DLL、应用程序或示例文件。
+C4D 文件里通常只能独立取到保存时的二维场景图片，因此 C4D 右键窗口支持缩放和平移，不能像 FBX/OBJ 一样旋转几何体。本项目不打包 Maxon 的 DLL 或示例文件。
 
-## 卸载
+## 卸载与许可
 
-双击解压目录中的 `Uninstall.cmd`。卸载器逐项恢复安装前的当前用户注册表值；发现值后来被其他程序更改时会保留其他程序的设置。
+双击解压目录中的 `Uninstall.cmd`。卸载器会恢复安装前的缩略图关联；若关联后来被其他软件修改，会保留其他软件的新设置。
 
-Windows 可能仍缓存旧缩略图。卸载或升级后如果仍看到水滴图标或旧图，可以关闭并重新打开文件夹，必要时使用 Windows“磁盘清理”清除“缩略图”缓存。
-
-## 构建与许可
-
-GitHub Actions 使用 MSVC、CMake 和 vcpkg 构建 Assimp 版本的通用查看器及 Windows Shell 扩展。项目代码采用 MIT 许可；Assimp 及其运行库的许可见 [第三方说明](THIRD-PARTY-NOTICES.md)。
-
+项目代码采用 MIT 许可。Assimp 及运行库许可见 [第三方说明](THIRD-PARTY-NOTICES.md)。

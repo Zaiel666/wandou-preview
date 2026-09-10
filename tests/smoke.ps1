@@ -1,7 +1,7 @@
 param([Parameter(Mandatory=$true)][string]$Backend,[Parameter(Mandatory=$true)][string]$Scene)
 $ErrorActionPreference='Stop'
 $root=Split-Path $PSScriptRoot -Parent
-$exe=Join-Path $root 'dist\C4DQuickPreview.exe'
+$exe=Join-Path $root 'dist\WandouImagePreview.exe'
 $output=Join-Path $PSScriptRoot 'smoke.png'
 if(Test-Path -LiteralPath $output){Remove-Item -LiteralPath $output}
 $p=Start-Process -FilePath $exe -ArgumentList ('--extract "'+$Backend+'" "'+$Scene+'" "'+$output+'"') -PassThru -WindowStyle Hidden

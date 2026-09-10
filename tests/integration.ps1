@@ -1,6 +1,6 @@
 ﻿param([Parameter(Mandatory=$true)][string]$Package,[Parameter(Mandatory=$true)][string]$Scene)
 $ErrorActionPreference='Stop'
-$app=Join-Path $env:LOCALAPPDATA 'C4DQuickPreview'
+$app=Join-Path $env:LOCALAPPDATA 'WandouPreview'
 $state=Join-Path $app 'registry-backup.json'
 if(Test-Path -LiteralPath $state){throw 'An existing installation must not be overwritten by this test.'}
 $root=Split-Path $PSScriptRoot -Parent

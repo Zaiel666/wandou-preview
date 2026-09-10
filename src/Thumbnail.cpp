@@ -13,10 +13,10 @@ static LONG objects=0;
 // Explorer only launches our bounded worker; Maxon's parser runs outside Explorer.
 HRESULT ExtractInWorker(const wchar_t* file, HBITMAP* bitmap) {
     wchar_t dll[32768];DWORD bytes=sizeof(dll);
-    if(RegGetValueW(HKEY_CURRENT_USER,L"Software\\C4DQuickPreview",L"Backend",RRF_RT_REG_SZ,nullptr,dll,&bytes)!=ERROR_SUCCESS)return E_FAIL;
+    if(RegGetValueW(HKEY_CURRENT_USER,L"Software\\WandouPreview",L"C4DBackend",RRF_RT_REG_SZ,nullptr,dll,&bytes)!=ERROR_SUCCESS)return E_FAIL;
     HMODULE self=nullptr;GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS|GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,reinterpret_cast<LPCWSTR>(&ExtractInWorker),&self);
     wchar_t module[32768];if(!GetModuleFileNameW(self,module,32768))return E_FAIL;
-    std::wstring exe(module);exe=exe.substr(0,exe.find_last_of(L"\\/"))+L"\\C4DQuickPreview.exe";
+    std::wstring exe(module);exe=exe.substr(0,exe.find_last_of(L"\\/"))+L"\\WandouImagePreview.exe";
     wchar_t tempDir[MAX_PATH],tempFile[MAX_PATH];if(!GetTempPathW(MAX_PATH,tempDir)||!GetTempFileNameW(tempDir,L"cqp",0,tempFile))return E_FAIL;
     std::wstring command=L"\""+exe+L"\" --extract-bmp \""+dll+L"\" \""+file+L"\" \""+tempFile+L"\"";
     STARTUPINFOW startup={sizeof(startup)};PROCESS_INFORMATION process={};
