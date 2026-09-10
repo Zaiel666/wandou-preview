@@ -1,48 +1,58 @@
-# C4D Quick Preview · C4D 快速预览
+# 3D 模型快速预览 · Model Quick Preview
 
-Windows 10/11 x64 的 C4D 场景缩略图试用工具。文件夹直接显示场景保存的预览图片，左下角显示小型 C4D 文字标识；右键可打开图片预览窗口。
+Windows 10/11 x64 的文件夹三维模型缩略图和右键交互预览工具。它不占用空格键，因此可以和 QuickLook 同时使用。
 
-**这是 0.1.0 C4D 验证版，不是完整三维查看器。** 预览窗口支持滚轮缩放、拖动平移、适合窗口，不支持旋转三维场景。HDR、Blender、FBX、OBJ 等格式尚未加入本版。QuickLook 和空格快捷键不受影响。
+![金属立方体图标](assets/metal-cube-preview.png)
+
+## 0.2.0 提供的功能
+
+- 文件资源管理器直接显示通用三维模型缩略图，左下角标注 FBX、OBJ、GLB 等文件格式。
+- 右键模型 → **3D 模型快速预览**，金属立方体图标用于辨认菜单项。
+- 左键拖动旋转，中键或右键拖动平移，滚轮缩放，双击或按 `Home`/`R` 恢复视角，`Esc` 退出。
+- C4D 文件继续显示场景保存时的图片；C4D 图片不含几何数据，因此窗口内只能缩放和平移。
+- 通用模型读取和渲染完全独立运行，不需要安装 Blender、3ds Max、Maya 或其 SDK。
+- 缩略图实际解析在受限工作进程中运行，20 秒超时、最大约 1 GiB 内存，避免损坏模型直接拖垮资源管理器。
+- 每用户安装，不修改默认打开软件，也不注册全局快捷键。卸载会恢复安装前的缩略图关联。
+
+## 直接支持的常用格式
+
+主要格式：FBX、OBJ、3DS、3MF、COLLADA/DAE、DXF、glTF/GLB、STL、PLY、DirectX X、X3D、IFC、LightWave、Modo、OpenGEX、USD/USDZ 等。
+
+安装器还为 Assimp 当前导入器包含的 AC/AC3D、ASE、B3D、BVH、COB、CSM、IQM、Irrlicht、M3D、MD2/MD3/MD5、MS3D、NDO、NFF、OFF、PMX、Quick3D、RAW、SCN、SIB、SMD、STEP、TER、UC、VTA、XGL、ZGL 等扩展名注册缩略图和右键预览。格式名被注册不代表任意版本、任意插件数据都能完整还原；窗口目前以静态网格和基础材质颜色为主。
+
+以下图三格式在 0.2.0 中**没有注册为可预览**：Alembic `.abc`、Bullet `.bullet`、Forger `.fpk`、Illustrator `.ai`、Redshift Proxy `.rs`、OpenVDB `.vdb`、VRML `.wrl`。它们需要额外解析器或专有格式支持；普通 `.xml` 也没有全局注册，因为会错误接管大量非三维 XML 文件。
+
+Blender `.blend` 不使用通用几何导入：Assimp 已弃用该格式支持。后续会采用 Blender 文件内置缩略图提取，避免假装能完整解析场景。
 
 ## 安装
 
-1. 在本仓库 **Releases** 下载 `C4D-QuickPreview-0.1.0-Windows-x64.zip`。不要下载 GitHub 自动提供的 Source code。
-2. 把 ZIP 完整解压到一个文件夹。
-3. 双击 `Install.cmd`，普通用户运行即可，无需管理员权限。
-4. 打开含 `.c4d` 文件的文件夹，将查看方式切换为 **大图标** 或 **超大图标**。
-5. 右键 `.c4d` → **C4D 快速预览**。Windows 11 的传统扩展菜单可能位于 **显示更多选项** 内。
+1. 在 [Releases](https://github.com/Zaiel666/c4d-quick-preview/releases) 下载 `Model-QuickPreview-0.2.0-Windows-x64.zip`，不要下载 GitHub 自动生成的 Source code。
+2. 完整解压 ZIP。
+3. 双击 `Install.cmd`。安装器会自动卸载本项目旧的 0.1.0 注册，再安装新版。
+4. 重新打开模型所在文件夹，切换为“大图标”或“超大图标”。
+5. 右键模型选择“3D 模型快速预览”。Windows 11 可能需要进入“显示更多选项”。
 
-详细说明和故障排查：[安装与使用](docs/安装与使用.md)。
+安装包目前没有商业代码签名证书，Windows 可能显示来源提示。发布页提供 SHA-256 校验值。
 
-## 依赖及兼容范围
+详细说明见 [安装与使用](docs/安装与使用.md)，已完成的检查见 [测试记录](docs/测试记录.md)。
 
-- 本机必须已有可加载的 `resource\libs\win64\win_thumbnail.dll`（来自用户自己的 Cinema 4D 安装）。不需要另外配置 SDK，也不需要打开 C4D 主程序。
-- 安装器会在 Program Files 下的 Cinema 4D 目录查找组件。自定义位置见安装文档。
-- 目前实际读取测试使用 Cinema 4D 2023 自带组件与示例场景。其他版本、第三方场景、没有保存预览的文件仍需测试。
-- 不是所有 C4D 安装都附带此 DLL。本机 2024 的标准位置没有找到它，2023 有；不代表所有 2024 安装情况相同。
-- 不分发 Maxon DLL、C4D 程序、用户场景或官方示例场景。删除或移动本机 C4D 组件后，需要重新安装并指定有效组件。
-- Windows 自带 .NET Framework 4.x 用于图片预览窗口；缩略图扩展为原生 x64 DLL。
+## C4D 说明
 
-## 大场景
+通用模型功能不依赖 C4D。若电脑装有带 `resource\libs\win64\win_thumbnail.dll` 的 Cinema 4D，安装器会自动启用 `.c4d` 场景图片缩略图；也可以在 PowerShell 中指定：
 
-读取文件中已有的图片，不计算场景最终渲染，也不主动载入几何数据进行渲染。具体读取量仍由本机 C4D 组件决定，不能保证每个版本对所有大文件都只读固定大小的数据。
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Install.ps1 -Cinema4DPath "D:\Maxon Cinema 4D 2023"
+```
 
-资源管理器使用 Windows 缩略图缓存。轻量适配器在 Shell 内运行，实际 C4D 解析放在独立工作进程，限制为 12 秒、512 MiB 内存；为支持每用户安装，本工具自身 CLSID 设置 `DisableProcessIsolation=1`，不更改其他处理器的隔离设置。右键窗口同样使用独立提取进程、12 秒超时。右键图片缓存由文件路径、大小、修改时间和组件版本时间戳生成键。缓存尚无自动容量清理，可手动删除 `%LOCALAPPDATA%\C4DQuickPreview\Cache`。
+本项目不打包、不上传 Maxon 的 DLL、应用程序或示例文件。
 
 ## 卸载
 
-双击解压目录的 `Uninstall.cmd`。程序恢复被替换的当前用户注册表值。如果值后来被其他程序修改，会保留其他程序的值。
+双击解压目录中的 `Uninstall.cmd`。卸载器逐项恢复安装前的当前用户注册表值；发现值后来被其他程序更改时会保留其他程序的设置。
 
-卸载不会停止资源管理器、关闭用户文件或清空系统缩略图缓存。程序及图片缓存保留在 `%LOCALAPPDATA%\C4DQuickPreview`；退出预览并注销 Windows 后可以手动删除。
+Windows 可能仍缓存旧缩略图。卸载或升级后如果仍看到水滴图标或旧图，可以关闭并重新打开文件夹，必要时使用 Windows“磁盘清理”清除“缩略图”缓存。
 
-## 开发
+## 构建与许可
 
-`scripts/build.ps1` 使用 Windows 的 .NET Framework C# 编译器构建窗口。原生适配器使用 MSVC：
+GitHub Actions 使用 MSVC、CMake 和 vcpkg 构建 Assimp 版本的通用查看器及 Windows Shell 扩展。项目代码采用 MIT 许可；Assimp 及其运行库的许可见 [第三方说明](THIRD-PARTY-NOTICES.md)。
 
-```bat
-cl /nologo /LD /O2 /MT /EHsc src\Thumbnail.cpp /link /DEF:src\Thumbnail.def /OUT:dist\C4DThumbnail.dll ole32.lib gdi32.lib user32.lib advapi32.lib uuid.lib
-```
-
-然后运行 `scripts/package.ps1`。GitHub Actions 自动完成两部分编译和打包。
-
-本工具源码采用 MIT 许可。Cinema 4D 与 Maxon 商标及组件归各自权利人所有；本项目不是 Maxon 官方产品。

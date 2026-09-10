@@ -1,8 +1,10 @@
 dist/
 build/
+vendor-cache/
 tests/*.png
 tests/*.error.txt
 tests/local/
+tests/model-output/
 *.obj
 *.lib
 *.exp

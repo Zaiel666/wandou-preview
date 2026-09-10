@@ -19,6 +19,13 @@ jobs:
       - name: Build C4D shell adapter
         shell: cmd
         run: cl /nologo /LD /O2 /MT /EHsc src\Thumbnail.cpp /link /DEF:src\Thumbnail.def /OUT:dist\C4DThumbnail.dll ole32.lib gdi32.lib user32.lib advapi32.lib uuid.lib
+      - name: Restore model importer cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            C:\vcpkg\installed
+            C:\vcpkg\packages
+          key: vcpkg-assimp-x64-windows-v1
       - name: Install model importer
         shell: cmd
         run: vcpkg install assimp:x64-windows
