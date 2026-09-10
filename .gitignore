@@ -2,6 +2,8 @@ dist/
 build/
 vendor-cache/
 tests/*.png
+tests/*.bmp
+tests/*.log
 tests/*.error.txt
 tests/*.tmp
 tests/local/
