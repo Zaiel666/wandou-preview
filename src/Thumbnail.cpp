@@ -2,37 +2,40 @@
 #include <windows.h>
 #include <thumbcache.h>
 #include <propsys.h>
+#include <shlobj.h>
+#include <string>
 #include <new>
 
 // Only this small adapter is distributed. Maxon's DLL is loaded from the user's installation.
 const CLSID CLSID_Preview={0x3d15370f,0x5744,0x41bf,{0x85,0xd8,0x8d,0x49,0x85,0x50,0x9c,0xee}};
 const CLSID CLSID_Maxon={0x2baa7283,0xb8ca,0x4993,{0x91,0xf7,0xce,0x75,0xb7,0x80,0xe1,0xf0}};
 static LONG objects=0;
-static HMODULE backend=nullptr;
-static INIT_ONCE once=INIT_ONCE_STATIC_INIT;
-BOOL CALLBACK LoadBackend(PINIT_ONCE, PVOID, PVOID*) {
-    wchar_t path[32768]; DWORD size=sizeof(path);
-    if(RegGetValueW(HKEY_CURRENT_USER,L"Software\\C4DQuickPreview",L"Backend",RRF_RT_REG_SZ,nullptr,path,&size)==ERROR_SUCCESS)
-        backend=LoadLibraryExW(path,nullptr,LOAD_WITH_ALTERED_SEARCH_PATH);
-    return TRUE;
-}
-HRESULT NewBackend(IThumbnailProvider** result,IStream* stream) {
-    InitOnceExecuteOnce(&once,LoadBackend,nullptr,nullptr);
-    if(!backend)return HRESULT_FROM_WIN32(ERROR_MOD_NOT_FOUND);
-    auto get=reinterpret_cast<HRESULT(STDAPICALLTYPE*)(REFCLSID,REFIID,void**)>(GetProcAddress(backend,"DllGetClassObject"));
-    if(!get)return E_NOINTERFACE;
-    IClassFactory* factory=nullptr;
-    HRESULT hr=get(CLSID_Maxon,IID_PPV_ARGS(&factory));
-    if(FAILED(hr))return hr;
-    IInitializeWithStream* init=nullptr;
-    hr=factory->CreateInstance(nullptr,IID_PPV_ARGS(&init));factory->Release();
-    if(FAILED(hr))return hr;
-    LARGE_INTEGER start={};hr=stream->Seek(start,STREAM_SEEK_SET,nullptr);
-    if(SUCCEEDED(hr))hr=init->Initialize(stream,STGM_READ);
-    if(SUCCEEDED(hr))hr=init->QueryInterface(IID_PPV_ARGS(result));
-    init->Release();return hr;
-}
-void Badge(HBITMAP bitmap) {
+// Explorer only launches our bounded worker; Maxon's parser runs outside Explorer.
+HRESULT ExtractInWorker(const wchar_t* file, HBITMAP* bitmap) {
+    wchar_t dll[32768];DWORD bytes=sizeof(dll);
+    if(RegGetValueW(HKEY_CURRENT_USER,L"Software\\C4DQuickPreview",L"Backend",RRF_RT_REG_SZ,nullptr,dll,&bytes)!=ERROR_SUCCESS)return E_FAIL;
+    HMODULE self=nullptr;GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS|GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,reinterpret_cast<LPCWSTR>(&ExtractInWorker),&self);
+    wchar_t module[32768];if(!GetModuleFileNameW(self,module,32768))return E_FAIL;
+    std::wstring exe(module);exe=exe.substr(0,exe.find_last_of(L"\\/"))+L"\\C4DQuickPreview.exe";
+    wchar_t tempDir[MAX_PATH],tempFile[MAX_PATH];if(!GetTempPathW(MAX_PATH,tempDir)||!GetTempFileNameW(tempDir,L"cqp",0,tempFile))return E_FAIL;
+    std::wstring command=L"\""+exe+L"\" --extract-bmp \""+dll+L"\" \""+file+L"\" \""+tempFile+L"\"";
+    STARTUPINFOW startup={sizeof(startup)};PROCESS_INFORMATION process={};
+    HRESULT hr=E_FAIL;
+    HANDLE job=CreateJobObjectW(nullptr,nullptr);
+    if(!job){DeleteFileW(tempFile);return E_FAIL;}
+    JOBOBJECT_EXTENDED_LIMIT_INFORMATION limits={};limits.BasicLimitInformation.LimitFlags=JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE|JOB_OBJECT_LIMIT_PROCESS_MEMORY;limits.ProcessMemoryLimit=512ull*1024*1024;
+    if(!SetInformationJobObject(job,JobObjectExtendedLimitInformation,&limits,sizeof(limits))){CloseHandle(job);DeleteFileW(tempFile);return E_FAIL;}
+    if(CreateProcessW(exe.c_str(),&command[0],nullptr,nullptr,FALSE,CREATE_NO_WINDOW|CREATE_SUSPENDED,nullptr,nullptr,&startup,&process)){
+        if(AssignProcessToJobObject(job,process.hProcess)){
+            ResumeThread(process.hThread);
+            if(WaitForSingleObject(process.hProcess,12000)==WAIT_OBJECT_0){DWORD code=1;GetExitCodeProcess(process.hProcess,&code);if(!code){*bitmap=static_cast<HBITMAP>(LoadImageW(nullptr,tempFile,IMAGE_BITMAP,0,0,LR_LOADFROMFILE|LR_CREATEDIBSECTION));if(*bitmap)hr=S_OK;}}
+        }
+        // Closing the job also terminates a timed-out worker.
+        TerminateProcess(process.hProcess,1);WaitForSingleObject(process.hProcess,2000);
+        CloseHandle(process.hThread);CloseHandle(process.hProcess);
+    }
+    CloseHandle(job);DeleteFileW(tempFile);DeleteFileW((std::wstring(tempFile)+L".error.txt").c_str());return hr;
+}void Badge(HBITMAP bitmap) {
     BITMAP info={}; if(!GetObjectW(bitmap,sizeof(info),&info)||info.bmWidth<48||info.bmHeight<32)return;
     HDC dc=CreateCompatibleDC(nullptr);if(!dc)return;
     HGDIOBJ old=SelectObject(dc,bitmap);
@@ -44,27 +47,27 @@ void Badge(HBITMAP bitmap) {
     DrawTextW(dc,L"C4D",3,&rect,DT_CENTER|DT_VCENTER|DT_SINGLELINE);
     SelectObject(dc,prev);DeleteObject(font);SelectObject(dc,old);DeleteDC(dc);
 }
-class Thumbnail final:public IThumbnailProvider,public IInitializeWithStream {
-    LONG refs=1;IStream* stream=nullptr;
+class Thumbnail final:public IThumbnailProvider,public IInitializeWithItem,public IInitializeWithFile {
+    LONG refs=1;std::wstring file;
 public:
-    Thumbnail(){InterlockedIncrement(&objects);}~Thumbnail(){if(stream)stream->Release();InterlockedDecrement(&objects);}
+    Thumbnail(){InterlockedIncrement(&objects);}~Thumbnail(){InterlockedDecrement(&objects);}
     HRESULT STDMETHODCALLTYPE QueryInterface(REFIID iid,void** value) override {
         if(!value)return E_POINTER;*value=nullptr;
         if(iid==IID_IUnknown||iid==__uuidof(IThumbnailProvider))*value=static_cast<IThumbnailProvider*>(this);
-        else if(iid==__uuidof(IInitializeWithStream))*value=static_cast<IInitializeWithStream*>(this);
+        else if(iid==__uuidof(IInitializeWithItem))*value=static_cast<IInitializeWithItem*>(this);
+        else if(iid==__uuidof(IInitializeWithFile))*value=static_cast<IInitializeWithFile*>(this);
         else return E_NOINTERFACE;AddRef();return S_OK;
     }
     ULONG STDMETHODCALLTYPE AddRef() override{return InterlockedIncrement(&refs);}
     ULONG STDMETHODCALLTYPE Release() override{LONG n=InterlockedDecrement(&refs);if(!n)delete this;return n;}
-    HRESULT STDMETHODCALLTYPE Initialize(IStream* value,DWORD) override{if(!value)return E_INVALIDARG;if(stream)return HRESULT_FROM_WIN32(ERROR_ALREADY_INITIALIZED);stream=value;stream->AddRef();return S_OK;}
+    HRESULT STDMETHODCALLTYPE Initialize(LPCWSTR value,DWORD)override{if(!value)return E_INVALIDARG;if(!file.empty())return HRESULT_FROM_WIN32(ERROR_ALREADY_INITIALIZED);file=value;return S_OK;}
+    HRESULT STDMETHODCALLTYPE Initialize(IShellItem* item,DWORD mode)override{if(!item)return E_INVALIDARG;PWSTR path=nullptr;HRESULT hr=item->GetDisplayName(SIGDN_FILESYSPATH,&path);if(SUCCEEDED(hr)){hr=Initialize(path,mode);CoTaskMemFree(path);}return hr;}
     HRESULT STDMETHODCALLTYPE GetThumbnail(UINT size,HBITMAP* bitmap,WTS_ALPHATYPE* alpha) override {
-        if(!bitmap||!alpha)return E_POINTER;*bitmap=nullptr;*alpha=WTSAT_UNKNOWN;if(!stream)return E_UNEXPECTED;
-        IThumbnailProvider* provider=nullptr;HRESULT hr=NewBackend(&provider,stream);if(FAILED(hr))return hr;
-        hr=provider->GetThumbnail(min(size,1024u),bitmap,alpha);provider->Release();
+        if(!bitmap||!alpha)return E_POINTER;*bitmap=nullptr;*alpha=WTSAT_UNKNOWN;if(file.empty())return E_UNEXPECTED;
+        HRESULT hr=ExtractInWorker(file.c_str(),bitmap);
         if(SUCCEEDED(hr)&&*bitmap){Badge(*bitmap);*alpha=WTSAT_RGB;}return hr;
     }
-};
-class Factory final:public IClassFactory {
+};class Factory final:public IClassFactory {
     LONG refs=1;
 public:
     Factory(){InterlockedIncrement(&objects);}~Factory(){InterlockedDecrement(&objects);}

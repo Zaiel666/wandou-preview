@@ -23,7 +23,7 @@ static class Native {
     [DllImport("gdi32")] public static extern bool DeleteObject(IntPtr obj);
     [DllImport("shlwapi", CharSet=CharSet.Unicode, PreserveSig=true)] public static extern int SHCreateStreamOnFileEx(string path, uint mode, uint attributes, bool create, IntPtr reserved, out IStream stream);
     [UnmanagedFunctionPointer(CallingConvention.StdCall)] public delegate int Factory(ref Guid clsid, ref Guid iid, out IntPtr result);
-    public static void Extract(string dll, string file, string output) {
+    public static void Extract(string dll, string file, string output, bool bmp) {
         IntPtr module=LoadLibraryEx(Path.GetFullPath(dll), IntPtr.Zero, 0x8);
         if(module==IntPtr.Zero) throw new System.ComponentModel.Win32Exception(Marshal.GetLastWin32Error(), "Cannot load the Cinema 4D thumbnail component.");
         IntPtr entry=GetProcAddress(module,"DllGetClassObject");
@@ -41,7 +41,7 @@ static class Native {
             ((IInitializeWithStream)provider).Initialize(stream,0);
             uint alpha; ((IThumbnailProvider)provider).GetThumbnail(512,out bitmap,out alpha);
             if(bitmap==IntPtr.Zero) throw new Exception("This scene has no readable saved preview.");
-            using(var img=Image.FromHbitmap(bitmap)) img.Save(output,ImageFormat.Png);
+            using(var img=Image.FromHbitmap(bitmap)) img.Save(output,bmp?ImageFormat.Bmp:ImageFormat.Png);
         } finally {
             if(bitmap!=IntPtr.Zero) DeleteObject(bitmap);
             if(provider!=null) Marshal.ReleaseComObject(provider);
@@ -105,7 +105,7 @@ class PreviewWindow : Form {
 }
 static class Program {
     [STAThread] static int Main(string[] args) {
-        if(args.Length==4 && args[0]=="--extract") {try{Native.Extract(args[1],args[2],args[3]);return 0;}catch(Exception ex){File.WriteAllText(args[3]+".error.txt",ex.ToString());return 1;}}
+        if(args.Length==4 && (args[0]=="--extract" || args[0]=="--extract-bmp")) {try{Native.Extract(args[1],args[2],args[3],args[0]=="--extract-bmp");return 0;}catch(Exception ex){File.WriteAllText(args[3]+".error.txt",ex.ToString());return 1;}}
         Application.EnableVisualStyles();Application.SetCompatibleTextRenderingDefault(false);
         if(args.Length!=1){MessageBox.Show("请右键 .c4d 文件，选择“C4D 快速预览”。\n此版本显示保存的场景图片，不支持三维旋转。","C4D 快速预览");return 0;}
         try{Application.Run(new PreviewWindow(args[0]));return 0;}catch(Exception ex){MessageBox.Show(ex.Message,"C4D 快速预览");return 1;}

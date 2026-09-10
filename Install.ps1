@@ -32,12 +32,15 @@ foreach($name in @('C4DQuickPreview.exe','C4DThumbnail.dll','Uninstall.ps1')){
 $changes=@(
     @{Path='Software\C4DQuickPreview';Name='Backend';Value=$backend},
     @{Path="Software\Classes\CLSID\$clsid";Name='';Value='C4D Quick Preview Thumbnail'},
+    @{Path="Software\Classes\CLSID\$clsid";Name='DisableProcessIsolation';Value=1;Kind='DWord'},
     @{Path="Software\Classes\CLSID\$clsid\InprocServer32";Name='';Value=(Join-Path $target 'C4DThumbnail.dll')},
     @{Path="Software\Classes\CLSID\$clsid\InprocServer32";Name='ThreadingModel';Value='Apartment'},
     @{Path=$handler;Name='';Value=$clsid},
     @{Path='Software\Classes\SystemFileAssociations\.c4d\shell\C4DQuickPreview';Name='';Value='C4D 快速预览'},
     @{Path='Software\Classes\SystemFileAssociations\.c4d\shell\C4DQuickPreview\command';Name='';Value=('"'+(Join-Path $target 'C4DQuickPreview.exe')+'" "%1"')}
 )
+$extensionKey=[Microsoft.Win32.Registry]::ClassesRoot.OpenSubKey('.c4d')
+if($extensionKey){$progId=$extensionKey.GetValue('');$extensionKey.Close();if($progId){$changes+=@{Path="Software\Classes\$progId\shellex\{e357fccd-a995-4576-b01f-234630154e96}";Name='';Value=$clsid}}}
 $backup=@()
 if(Test-Path -LiteralPath $stateFile){$backup=@(Get-Content -LiteralPath $stateFile -Raw | ConvertFrom-Json)}
 foreach($change in $changes){
@@ -50,7 +53,7 @@ foreach($change in $changes){
 }
 $backup | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $stateFile -Encoding UTF8
 try {
-    foreach($change in $changes){$key=[Microsoft.Win32.Registry]::CurrentUser.CreateSubKey($change.Path);try{$key.SetValue($change.Name,$change.Value,[Microsoft.Win32.RegistryValueKind]::String)}finally{$key.Close()}}
+    foreach($change in $changes){$key=[Microsoft.Win32.Registry]::CurrentUser.CreateSubKey($change.Path);try{$kind=[Microsoft.Win32.RegistryValueKind]::String;if($change.Kind){$kind=[Microsoft.Win32.RegistryValueKind]::$($change.Kind)};$key.SetValue($change.Name,$change.Value,$kind)}finally{$key.Close()}}
 } catch {
     $originalError=$_
     & (Join-Path $target 'Uninstall.ps1')

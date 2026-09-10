@@ -1,6 +1,7 @@
 dist/
 tests/*.png
 tests/*.error.txt
+tests/local/
 *.obj
 *.lib
 *.exp
