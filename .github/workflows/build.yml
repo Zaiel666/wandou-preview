@@ -20,6 +20,7 @@ jobs:
         shell: cmd
         run: cl /nologo /LD /O2 /MT /EHsc src\Thumbnail.cpp /link /DEF:src\Thumbnail.def /OUT:dist\C4DThumbnail.dll ole32.lib gdi32.lib user32.lib advapi32.lib uuid.lib
       - name: Restore model importer cache
+        id: vcpkg-cache
         uses: actions/cache@v4
         with:
           path: |
@@ -29,6 +30,14 @@ jobs:
       - name: Install model importer
         shell: cmd
         run: vcpkg install assimp:x64-windows
+      - name: Save model importer cache before compiling
+        if: steps.vcpkg-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            C:\vcpkg\installed
+            C:\vcpkg\packages
+          key: vcpkg-assimp-x64-windows-v1
       - name: Build interactive model viewer and thumbnail adapter
         shell: cmd
         run: >-

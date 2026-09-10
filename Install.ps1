@@ -66,6 +66,12 @@ $changes+=@(
     @{Path='Software\Classes\SystemFileAssociations\.ai\shell\WandouPreview';Name='Icon';Value=$icon},
     @{Path='Software\Classes\SystemFileAssociations\.ai\shell\WandouPreview\command';Name='';Value=('"'+$imageExe+'" "%1"')}
 )
+$changes+=@(
+    @{Path="Software\Classes\.hdr\shellex\$thumbnailSlot";Name='';Value=$modelClsid},
+    @{Path='Software\Classes\SystemFileAssociations\.hdr\shell\WandouPreview';Name='';Value='豌豆预览（HDR）'},
+    @{Path='Software\Classes\SystemFileAssociations\.hdr\shell\WandouPreview';Name='Icon';Value=$icon},
+    @{Path='Software\Classes\SystemFileAssociations\.hdr\shell\WandouPreview\command';Name='';Value=('"'+$imageExe+'" "%1"')}
+)
 
 if($backend){
     [IO.File]::WriteAllText((Join-Path $target 'backend.txt'),$backend,(New-Object Text.UTF8Encoding($false)))

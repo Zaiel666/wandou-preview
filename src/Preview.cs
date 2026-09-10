@@ -7,6 +7,7 @@ using System.Runtime.InteropServices;
 using System.Runtime.InteropServices.ComTypes;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 
@@ -85,6 +86,37 @@ static class Native {
             if(bitmap!=IntPtr.Zero)DeleteObject(bitmap);if(factory!=null)Marshal.ReleaseComObject(factory);try{if(File.Exists(pdf))File.Delete(pdf);}catch{}
         }
     }
+
+    static string ReadAsciiLine(BinaryReader reader) {
+        var bytes=new MemoryStream();
+        while(reader.BaseStream.Position<reader.BaseStream.Length){byte value=reader.ReadByte();if(value==10)break;if(value!=13)bytes.WriteByte(value);}
+        return Encoding.ASCII.GetString(bytes.ToArray());
+    }
+
+    public static void ExtractHdr(string file,string output,int requestedSize,bool bmp) {
+        int width,height;byte[] rgbe;
+        using(var input=File.OpenRead(file))using(var reader=new BinaryReader(input)){
+            string first=ReadAsciiLine(reader);if(!first.StartsWith("#?"))throw new Exception("不是有效的 Radiance HDR 文件。");
+            string line;do{line=ReadAsciiLine(reader);if(input.Position>=input.Length)throw new Exception("HDR 文件头不完整。");}while(line.Length>0);
+            string resolution=ReadAsciiLine(reader);var match=Regex.Match(resolution,@"^([+-])Y\s+(\d+)\s+([+-])X\s+(\d+)$");if(!match.Success)throw new Exception("暂不支持这个 HDR 像素排列。");
+            height=Int32.Parse(match.Groups[2].Value);width=Int32.Parse(match.Groups[4].Value);if(width<1||height<1||((long)width*height)>150000000)throw new Exception("HDR 图片尺寸无效或过大。");rgbe=new byte[width*height*4];
+            for(int y=0;y<height;y++){
+                byte a=reader.ReadByte(),b=reader.ReadByte(),c=reader.ReadByte(),d=reader.ReadByte();int row=y*width*4;
+                if(width>=8&&width<=32767&&a==2&&b==2&&(c&128)==0&&((c<<8)|d)==width){
+                    for(int channel=0;channel<4;channel++){int x=0;while(x<width){byte code=reader.ReadByte();if(code>128){int count=code-128;if(count==0||x+count>width)throw new Exception("HDR 扫描行损坏。");byte value=reader.ReadByte();for(int i=0;i<count;i++)rgbe[row+(x+i)*4+channel]=value;x+=count;}else{int count=code;if(count==0||x+count>width)throw new Exception("HDR 扫描行损坏。");for(int i=0;i<count;i++)rgbe[row+(x+i)*4+channel]=reader.ReadByte();x+=count;}}}
+                }else{
+                    rgbe[row]=a;rgbe[row+1]=b;rgbe[row+2]=c;rgbe[row+3]=d;for(int x=1;x<width;x++){int p=row+x*4;rgbe[p]=reader.ReadByte();rgbe[p+1]=reader.ReadByte();rgbe[p+2]=reader.ReadByte();rgbe[p+3]=reader.ReadByte();}
+                }
+            }
+        }
+        int maxSize=Math.Max(128,Math.Min(1024,requestedSize));double scale=Math.Min(1.0,Math.Min((double)maxSize/width,(double)maxSize/height));int outWidth=Math.Max(1,(int)Math.Round(width*scale)),outHeight=Math.Max(1,(int)Math.Round(height*scale));
+        double sum=0;int samples=0;for(int i=0;i<rgbe.Length;i+=Math.Max(4,(rgbe.Length/200000)&~3)){byte e=rgbe[i+3];if(e==0)continue;double f=Math.Pow(2.0,e-136);double lum=(rgbe[i]*.2126+rgbe[i+1]*.7152+rgbe[i+2]*.0722)*f;sum+=Math.Log(1e-5+lum);samples++;}double exposure=samples>0?.18/Math.Exp(sum/samples):1;
+        using(var image=new Bitmap(outWidth,outHeight,PixelFormat.Format24bppRgb)){
+            var area=new Rectangle(0,0,outWidth,outHeight);var data=image.LockBits(area,ImageLockMode.WriteOnly,PixelFormat.Format24bppRgb);byte[] pixels=new byte[Math.Abs(data.Stride)*outHeight];
+            for(int y=0;y<outHeight;y++)for(int x=0;x<outWidth;x++){int sx=Math.Min(width-1,(int)(x/scale)),sy=Math.Min(height-1,(int)(y/scale)),source=(sy*width+sx)*4,target=y*data.Stride+x*3;byte e=rgbe[source+3];double f=e==0?0:Math.Pow(2.0,e-136);for(int channel=0;channel<3;channel++){double linear=rgbe[source+channel]*f*exposure,mapped=Math.Pow(1-Math.Exp(-Math.Max(0,linear)),1/2.2);pixels[target+2-channel]=(byte)Math.Max(0,Math.Min(255,(int)Math.Round(mapped*255)));}}
+            Marshal.Copy(pixels,0,data.Scan0,pixels.Length);image.UnlockBits(data);image.Save(output,bmp?ImageFormat.Bmp:ImageFormat.Png);
+        }
+    }
 }
 
 class PreviewWindow : Form {
@@ -95,11 +127,11 @@ class PreviewWindow : Form {
         Width=1040;Height=760;MinimumSize=new Size(620,420);StartPosition=FormStartPosition.CenterScreen;Icon=Icon.ExtractAssociatedIcon(Application.ExecutablePath);
         BackColor=Color.FromArgb(25,28,34);ForeColor=Color.White;Font=new Font("Microsoft YaHei UI",10);
         var tools=new FlowLayoutPanel{Dock=DockStyle.Top,Height=48,Padding=new Padding(10,7,0,0)};var reset=new Button{Text="适合窗口",AutoSize=true};reset.Click+=(s,e)=>{zoom=1;offset=PointF.Empty;canvas.Invalidate();};tools.Controls.Add(reset);
-        string explanation=badge=="AI"?"AI 画面预览 · 滚轮缩放 · 拖动平移":"C4D 保存的场景图片 · 滚轮缩放 · 拖动平移";tools.Controls.Add(new Label{Text=explanation,AutoSize=true,Margin=new Padding(18,6,0,0)});
+        string explanation=badge=="AI"?"AI 画面预览 · 滚轮缩放 · 拖动平移":badge=="HDR"?"HDR 自动曝光预览 · 滚轮缩放 · 拖动平移":"C4D 保存的场景图片 · 滚轮缩放 · 拖动平移";tools.Controls.Add(new Label{Text=explanation,AutoSize=true,Margin=new Padding(18,6,0,0)});
         status.Dock=DockStyle.Bottom;status.Height=38;status.Padding=new Padding(12,7,0,0);status.Text="正在读取预览…";canvas.Dock=DockStyle.Fill;canvas.Paint+=PaintPreview;
         canvas.MouseWheel+=(s,e)=>{zoom=Math.Max(.1f,Math.Min(12f,zoom*(e.Delta>0?1.15f:1/1.15f)));canvas.Invalidate();};canvas.MouseDown+=(s,e)=>{if(e.Button==MouseButtons.Left){dragging=true;last=e.Location;canvas.Capture=true;}};canvas.MouseMove+=(s,e)=>{if(dragging){offset.X+=e.X-last.X;offset.Y+=e.Y-last.Y;last=e.Location;canvas.Invalidate();}};canvas.MouseUp+=(s,e)=>{dragging=false;canvas.Capture=false;};canvas.MouseEnter+=(s,e)=>canvas.Focus();canvas.Resize+=(s,e)=>canvas.Invalidate();
         Controls.Add(canvas);Controls.Add(tools);Controls.Add(status);
-        Shown+=async(s,e)=>{try{var cached=await Task.Run(()=>Generate(file));if(IsDisposed)return;using(var input=Image.FromFile(cached))preview=new Bitmap(input);status.Text=Path.GetFileName(file)+(badge=="AI"?" · PDF 兼容预览":" · 保存时的 C4D 场景图片");canvas.Invalidate();}catch(Exception ex){if(!IsDisposed)status.Text="无法预览："+ex.Message;}};FormClosed+=(s,e)=>{if(preview!=null)preview.Dispose();};
+        Shown+=async(s,e)=>{try{var cached=await Task.Run(()=>Generate(file));if(IsDisposed)return;using(var input=Image.FromFile(cached))preview=new Bitmap(input);status.Text=Path.GetFileName(file)+(badge=="AI"?" · PDF 兼容预览":badge=="HDR"?" · 自动曝光预览":" · 保存时的 C4D 场景图片");canvas.Invalidate();}catch(Exception ex){if(!IsDisposed)status.Text="无法预览："+ex.Message;}};FormClosed+=(s,e)=>{if(preview!=null)preview.Dispose();};
     }
     void PaintPreview(object sender,PaintEventArgs e) {
         if(preview!=null){float fit=Math.Min((canvas.Width-40f)/preview.Width,(canvas.Height-40f)/preview.Height)*zoom;float w=preview.Width*fit,h=preview.Height*fit;e.Graphics.InterpolationMode=System.Drawing.Drawing2D.InterpolationMode.HighQualityBicubic;e.Graphics.DrawImage(preview,(canvas.Width-w)/2+offset.X,(canvas.Height-h)/2+offset.Y,w,h);}
@@ -107,12 +139,12 @@ class PreviewWindow : Form {
     }
     static string Quote(string value){return "\""+value.Replace("\"","")+"\"";}
     static string Generate(string file) {
-        if(!File.Exists(file))throw new Exception("文件不存在。");string extension=Path.GetExtension(file).ToLowerInvariant();if(extension!=".c4d"&&extension!=".ai")throw new Exception("这个窗口只处理 C4D 和 AI 文件。");
+        if(!File.Exists(file))throw new Exception("文件不存在。");string extension=Path.GetExtension(file).ToLowerInvariant();if(extension!=".c4d"&&extension!=".ai"&&extension!=".hdr")throw new Exception("这个窗口只处理 C4D、AI 和 HDR 文件。");
         var info=new FileInfo(file);string signature=file+"|"+info.Length+"|"+info.LastWriteTimeUtc.Ticks,dll=null;
         if(extension==".c4d"){string backendFile=Path.Combine(AppDomain.CurrentDomain.BaseDirectory,"backend.txt");if(!File.Exists(backendFile))throw new Exception("没有找到本机 Cinema 4D 组件，请重新运行安装程序。");dll=File.ReadAllText(backendFile).Trim();if(!File.Exists(dll))throw new Exception("Cinema 4D 组件已移动，请重新安装豌豆预览。");signature+="|"+dll+"|"+new FileInfo(dll).LastWriteTimeUtc.Ticks;}
         string key;using(var hash=SHA256.Create())key=BitConverter.ToString(hash.ComputeHash(Encoding.UTF8.GetBytes(signature))).Replace("-","");string dir=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),"WandouPreview","Cache");Directory.CreateDirectory(dir);string target=Path.Combine(dir,key+".png");if(File.Exists(target))return target;string temporary=Path.Combine(dir,Guid.NewGuid().ToString("N")+".png");
         try {
-            string arguments=extension==".ai"?"--extract-ai "+Quote(file)+" "+Quote(temporary)+" 1024":"--extract "+Quote(dll)+" "+Quote(file)+" "+Quote(temporary);var start=new ProcessStartInfo(Application.ExecutablePath,arguments){UseShellExecute=false,CreateNoWindow=true};
+            string arguments=extension==".ai"?"--extract-ai "+Quote(file)+" "+Quote(temporary)+" 1024":extension==".hdr"?"--extract-hdr "+Quote(file)+" "+Quote(temporary)+" 1024":"--extract "+Quote(dll)+" "+Quote(file)+" "+Quote(temporary);var start=new ProcessStartInfo(Application.ExecutablePath,arguments){UseShellExecute=false,CreateNoWindow=true};
             using(var child=Process.Start(start)){if(!child.WaitForExit(15000)){try{child.Kill();child.WaitForExit(2000);}catch{}throw new Exception("读取超过 15 秒，已停止。");}if(child.ExitCode!=0||!File.Exists(temporary)){string error=temporary+".error.txt",detail=File.Exists(error)?File.ReadAllText(error):"文件中没有可读取的预览。";try{if(File.Exists(error))File.Delete(error);}catch{}throw new Exception(detail.Split(new[]{'\r','\n'},StringSplitOptions.RemoveEmptyEntries)[0]);}}
             if(!File.Exists(target)){try{File.Move(temporary,target);}catch(IOException){if(!File.Exists(target))throw;}}return target;
         } finally {if(File.Exists(temporary))File.Delete(temporary);}
@@ -123,6 +155,7 @@ static class Program {
     [STAThread] static int Main(string[] args) {
         if(args.Length==4&&(args[0]=="--extract"||args[0]=="--extract-bmp")){try{Native.ExtractC4D(args[1],args[2],args[3],args[0]=="--extract-bmp");return 0;}catch(Exception ex){File.WriteAllText(args[3]+".error.txt",ex.ToString());return 1;}}
         if(args.Length==4&&(args[0]=="--extract-ai"||args[0]=="--extract-ai-bmp")){try{Native.ExtractAi(args[1],args[2],Int32.Parse(args[3]),args[0]=="--extract-ai-bmp");return 0;}catch(Exception ex){File.WriteAllText(args[2]+".error.txt",ex.ToString());return 1;}}
-        Application.EnableVisualStyles();Application.SetCompatibleTextRenderingDefault(false);if(args.Length!=1){MessageBox.Show("请在资源管理器中右键 C4D 或 AI 文件，选择“豌豆预览”。","豌豆预览 0.1.0");return 0;}try{Application.Run(new PreviewWindow(args[0]));return 0;}catch(Exception ex){MessageBox.Show(ex.Message,"豌豆预览 0.1.0");return 1;}
+        if(args.Length==4&&(args[0]=="--extract-hdr"||args[0]=="--extract-hdr-bmp")){try{Native.ExtractHdr(args[1],args[2],Int32.Parse(args[3]),args[0]=="--extract-hdr-bmp");return 0;}catch(Exception ex){File.WriteAllText(args[2]+".error.txt",ex.ToString());return 1;}}
+        Application.EnableVisualStyles();Application.SetCompatibleTextRenderingDefault(false);if(args.Length!=1){MessageBox.Show("请在资源管理器中右键 C4D、AI 或 HDR 文件，选择“豌豆预览”。","豌豆预览 0.1.0");return 0;}try{Application.Run(new PreviewWindow(args[0]));return 0;}catch(Exception ex){MessageBox.Show(ex.Message,"豌豆预览 0.1.0");return 1;}
     }
 }
