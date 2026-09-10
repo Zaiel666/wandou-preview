@@ -35,7 +35,8 @@ HRESULT ExtractInWorker(const wchar_t* file, HBITMAP* bitmap) {
         CloseHandle(process.hThread);CloseHandle(process.hProcess);
     }
     CloseHandle(job);DeleteFileW(tempFile);DeleteFileW((std::wstring(tempFile)+L".error.txt").c_str());return hr;
-}void Badge(HBITMAP bitmap) {
+}
+void Badge(HBITMAP bitmap) {
     BITMAP info={}; if(!GetObjectW(bitmap,sizeof(info),&info)||info.bmWidth<48||info.bmHeight<32)return;
     HDC dc=CreateCompatibleDC(nullptr);if(!dc)return;
     HGDIOBJ old=SelectObject(dc,bitmap);
@@ -46,6 +47,17 @@ HRESULT ExtractInWorker(const wchar_t* file, HBITMAP* bitmap) {
     HGDIOBJ prev=SelectObject(dc,font);SetBkMode(dc,TRANSPARENT);SetTextColor(dc,RGB(255,255,255));
     DrawTextW(dc,L"C4D",3,&rect,DT_CENTER|DT_VCENTER|DT_SINGLELINE);
     SelectObject(dc,prev);DeleteObject(font);SelectObject(dc,old);DeleteDC(dc);
+}
+void Fit(HBITMAP* bitmap,UINT size){
+    BITMAP info={};if(!GetObjectW(*bitmap,sizeof(info),&info)||!size)return;
+    int longest=max(info.bmWidth,info.bmHeight);if(longest<=static_cast<int>(size))return;
+    int w=max(1,static_cast<int>(static_cast<long long>(info.bmWidth)*size/longest)),h=max(1,static_cast<int>(static_cast<long long>(info.bmHeight)*size/longest));
+    BITMAPINFO bi={};bi.bmiHeader.biSize=sizeof(BITMAPINFOHEADER);bi.bmiHeader.biWidth=w;bi.bmiHeader.biHeight=-h;bi.bmiHeader.biPlanes=1;bi.bmiHeader.biBitCount=32;bi.bmiHeader.biCompression=BI_RGB;
+    void* bits=nullptr;HBITMAP scaled=CreateDIBSection(nullptr,&bi,DIB_RGB_COLORS,&bits,nullptr,0);if(!scaled)return;
+    HDC src=CreateCompatibleDC(nullptr),dst=CreateCompatibleDC(nullptr);if(!src||!dst){if(src)DeleteDC(src);if(dst)DeleteDC(dst);DeleteObject(scaled);return;}
+    HGDIOBJ a=SelectObject(src,*bitmap),b=SelectObject(dst,scaled);SetStretchBltMode(dst,HALFTONE);SetBrushOrgEx(dst,0,0,nullptr);
+    BOOL ok=StretchBlt(dst,0,0,w,h,src,0,0,info.bmWidth,info.bmHeight,SRCCOPY);SelectObject(src,a);SelectObject(dst,b);DeleteDC(src);DeleteDC(dst);
+    if(ok){DeleteObject(*bitmap);*bitmap=scaled;}else DeleteObject(scaled);
 }
 class Thumbnail final:public IThumbnailProvider,public IInitializeWithItem,public IInitializeWithFile {
     LONG refs=1;std::wstring file;
@@ -65,9 +77,10 @@ public:
     HRESULT STDMETHODCALLTYPE GetThumbnail(UINT size,HBITMAP* bitmap,WTS_ALPHATYPE* alpha) override {
         if(!bitmap||!alpha)return E_POINTER;*bitmap=nullptr;*alpha=WTSAT_UNKNOWN;if(file.empty())return E_UNEXPECTED;
         HRESULT hr=ExtractInWorker(file.c_str(),bitmap);
-        if(SUCCEEDED(hr)&&*bitmap){Badge(*bitmap);*alpha=WTSAT_RGB;}return hr;
+        if(SUCCEEDED(hr)&&*bitmap){Fit(bitmap,min(size,1024u));Badge(*bitmap);*alpha=WTSAT_RGB;}return hr;
     }
-};class Factory final:public IClassFactory {
+};
+class Factory final:public IClassFactory {
     LONG refs=1;
 public:
     Factory(){InterlockedIncrement(&objects);}~Factory(){InterlockedDecrement(&objects);}
