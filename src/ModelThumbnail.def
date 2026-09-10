@@ -1,0 +1,5 @@
+LIBRARY ModelThumbnail
+EXPORTS
+    DllGetClassObject=ModelGetClassObject
+    DllCanUnloadNow=ModelCanUnloadNow
+

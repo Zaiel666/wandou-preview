@@ -1,6 +1,6 @@
 ﻿$ErrorActionPreference='Stop'
 $app=Join-Path $env:LOCALAPPDATA 'C4DQuickPreview'
-$stateFile=Join-Path $app 'registry-backup.json'
+$stateFile=Join-Path $app 'registry-backup-v0.2.json'
 if(-not(Test-Path -LiteralPath $stateFile)){Write-Host 'No installation backup found; nothing changed.';exit 0}
 $backup=Get-Content -LiteralPath $stateFile -Raw | ConvertFrom-Json
 foreach($entry in $backup){
