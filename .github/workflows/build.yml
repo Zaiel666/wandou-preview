@@ -18,7 +18,7 @@ jobs:
         run: ./scripts/build.ps1
       - name: Build shell adapter
         shell: cmd
-        run: cl /nologo /LD /O2 /MT /EHsc src\Thumbnail.cpp /link /OUT:dist\C4DThumbnail.dll ole32.lib gdi32.lib user32.lib advapi32.lib uuid.lib
+        run: cl /nologo /LD /O2 /MT /EHsc src\Thumbnail.cpp /link /DEF:src\Thumbnail.def /OUT:dist\C4DThumbnail.dll ole32.lib gdi32.lib user32.lib advapi32.lib uuid.lib
       - name: Package
         shell: powershell
         run: ./scripts/package.ps1

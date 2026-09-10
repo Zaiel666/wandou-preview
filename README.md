@@ -40,7 +40,7 @@ Windows 10/11 x64 的 C4D 场景缩略图试用工具。文件夹直接显示场
 `scripts/build.ps1` 使用 Windows 的 .NET Framework C# 编译器构建窗口。原生适配器使用 MSVC：
 
 ```bat
-cl /nologo /LD /O2 /MT /EHsc src\Thumbnail.cpp /link /OUT:dist\C4DThumbnail.dll ole32.lib gdi32.lib user32.lib advapi32.lib uuid.lib
+cl /nologo /LD /O2 /MT /EHsc src\Thumbnail.cpp /link /DEF:src\Thumbnail.def /OUT:dist\C4DThumbnail.dll ole32.lib gdi32.lib user32.lib advapi32.lib uuid.lib
 ```
 
 然后运行 `scripts/package.ps1`。GitHub Actions 自动完成两部分编译和打包。

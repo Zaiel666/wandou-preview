@@ -1,0 +1,4 @@
+LIBRARY C4DThumbnail
+EXPORTS
+    DllGetClassObject=PreviewGetClassObject
+    DllCanUnloadNow=PreviewCanUnloadNow

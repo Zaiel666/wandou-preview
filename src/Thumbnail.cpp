@@ -74,5 +74,5 @@ public:
     HRESULT STDMETHODCALLTYPE CreateInstance(IUnknown* outer,REFIID iid,void** value)override{if(!value)return E_POINTER;*value=nullptr;if(outer)return CLASS_E_NOAGGREGATION;auto obj=new(std::nothrow) Thumbnail();if(!obj)return E_OUTOFMEMORY;HRESULT hr=obj->QueryInterface(iid,value);obj->Release();return hr;}
     HRESULT STDMETHODCALLTYPE LockServer(BOOL lock)override{if(lock)InterlockedIncrement(&objects);else InterlockedDecrement(&objects);return S_OK;}
 };
-extern "C" __declspec(dllexport) HRESULT STDAPICALLTYPE DllGetClassObject(REFCLSID clsid,REFIID iid,void** value){if(!value)return E_POINTER;*value=nullptr;if(clsid!=CLSID_Preview)return CLASS_E_CLASSNOTAVAILABLE;auto f=new(std::nothrow) Factory();if(!f)return E_OUTOFMEMORY;HRESULT hr=f->QueryInterface(iid,value);f->Release();return hr;}
-extern "C" __declspec(dllexport) HRESULT STDAPICALLTYPE DllCanUnloadNow(){return objects==0?S_OK:S_FALSE;}
+extern "C" __declspec(dllexport) HRESULT STDAPICALLTYPE PreviewGetClassObject(REFCLSID clsid,REFIID iid,void** value){if(!value)return E_POINTER;*value=nullptr;if(clsid!=CLSID_Preview)return CLASS_E_CLASSNOTAVAILABLE;auto f=new(std::nothrow) Factory();if(!f)return E_OUTOFMEMORY;HRESULT hr=f->QueryInterface(iid,value);f->Release();return hr;}
+extern "C" __declspec(dllexport) HRESULT STDAPICALLTYPE PreviewCanUnloadNow(){return objects==0?S_OK:S_FALSE;}
