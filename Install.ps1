@@ -104,7 +104,7 @@ try{
 }catch{$originalError=$_;& (Join-Path $target 'Uninstall.ps1');throw $originalError}
 
 Add-Type -TypeDefinition 'using System;using System.Runtime.InteropServices;public static class WandouShellNotify{[DllImport("shell32.dll")]public static extern void SHChangeNotify(uint e,uint f,IntPtr a,IntPtr b);}'
-[WandouShellNotify]::SHChangeNotify(0x08000000,0,[IntPtr]::Zero,[IntPtr]::Zero)
+[WandouShellNotify]::SHChangeNotify(0x08000000,0x1000,[IntPtr]::Zero,[IntPtr]::Zero)
 Write-Host '豌豆预览 0.1.0 安装完成。' -ForegroundColor Green
 Write-Host '文件夹切换到“大图标”或“超大图标”即可查看缩略图；右键模型可旋转、缩放。'
 Write-Host 'Windows 11 首次使用可能需要点“显示更多选项”。'

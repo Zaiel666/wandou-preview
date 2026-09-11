@@ -88,6 +88,7 @@ int WINAPI wWinMain(HINSTANCE instance,HINSTANCE,PWSTR,int){
     int count=0;LPWSTR* args=CommandLineToArgvW(GetCommandLineW(),&count);if(count<2){MessageBoxW(nullptr,L"请右键一个支持的三维模型，选择“3D 模型快速预览”。",L"豌豆预览 0.1.0",MB_ICONINFORMATION);return 0;}
     bool render=count>=5&&std::wstring(args[1])==L"--render";g.file=render?args[2]:args[1];std::wstring output=render?args[3]:L"";int size=render?std::max(64,std::min(1024,_wtoi(args[4]))):900;
     if(!LoadModel(g.file)){std::wstring detail=L"无法读取这个模型。\n\n"+std::wstring(g.error.begin(),g.error.end());if(!render)MessageBoxW(nullptr,detail.c_str(),L"豌豆预览 0.1.0",MB_ICONERROR);LocalFree(args);return 2;}
+    if(!render)SHChangeNotify(SHCNE_UPDATEITEM,SHCNF_PATHW|SHCNF_FLUSH,g.file.c_str(),nullptr);
     HWND window=MakeWindow(instance,render,size);if(!window){LocalFree(args);return 3;}g.window=window;g.ready=true;wglMakeCurrent(g.dc,g.gl);
     if(render){bool ok=SaveBmp(output,size);DestroyWindow(window);LocalFree(args);return ok?0:4;}
     ShowWindow(window,SW_SHOW);UpdateWindow(window);MSG msg;while(GetMessageW(&msg,nullptr,0,0)>0){TranslateMessage(&msg);DispatchMessageW(&msg);}LocalFree(args);return int(msg.wParam);

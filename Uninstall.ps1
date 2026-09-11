@@ -11,6 +11,6 @@ foreach($entry in $backup){
 foreach($entry in @($backup | Sort-Object {$_.Path.Length} -Descending)){$key=[Microsoft.Win32.Registry]::CurrentUser.OpenSubKey($entry.Path);if($key){$empty=$key.ValueCount -eq 0 -and $key.SubKeyCount -eq 0;$key.Close();if($empty){[Microsoft.Win32.Registry]::CurrentUser.DeleteSubKey($entry.Path,$false)}}}
 Remove-Item -LiteralPath $stateFile
 Add-Type -TypeDefinition 'using System;using System.Runtime.InteropServices;public static class WandouShellRemoveNotify{[DllImport("shell32.dll")]public static extern void SHChangeNotify(uint e,uint f,IntPtr a,IntPtr b);}'
-[WandouShellRemoveNotify]::SHChangeNotify(0x08000000,0,[IntPtr]::Zero,[IntPtr]::Zero)
+[WandouShellRemoveNotify]::SHChangeNotify(0x08000000,0x1000,[IntPtr]::Zero,[IntPtr]::Zero)
 Write-Host '豌豆预览已卸载，原来的文件关联已恢复。' -ForegroundColor Green
 Write-Host "程序缓存保留在 $app；注销 Windows 后可以手动删除此目录。"
