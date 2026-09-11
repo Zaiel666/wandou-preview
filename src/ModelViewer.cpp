@@ -2,6 +2,7 @@
 #include <windows.h>
 #include <windowsx.h>
 #include <shellapi.h>
+#include <shlobj.h>
 #include <gl/GL.h>
 #include <assimp/Importer.hpp>
 #include <assimp/material.h>
