@@ -12,7 +12,13 @@ foreach($legacy in @(
 }
 
 $app=Join-Path $env:LOCALAPPDATA 'WandouPreview'
-$target=Join-Path $app '0.2.0'
+# Shell extensions may remain loaded while Explorer is running. Installing each
+# binary build into an immutable directory avoids overwriting a locked DLL and
+# makes upgrades take effect immediately without restarting Windows.
+$payloadHashes=@(Get-ChildItem -LiteralPath $PSScriptRoot -File | Where-Object {$_.Extension -in @('.exe','.dll')} | Sort-Object Name | ForEach-Object {(Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash}) -join ''
+$sha=[Security.Cryptography.SHA256]::Create()
+try{$buildId=([BitConverter]::ToString($sha.ComputeHash([Text.Encoding]::UTF8.GetBytes($payloadHashes))).Replace('-','').Substring(0,12))}finally{$sha.Dispose()}
+$target=Join-Path $app ('0.2.0-'+$buildId)
 $stateFile=Join-Path $app 'registry-backup.json'
 $thumbnailSlot='{e357fccd-a995-4576-b01f-234630154e96}'
 $c4dClsid='{3D15370F-5744-41BF-85D8-8D4985509CEE}'
