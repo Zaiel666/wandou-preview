@@ -4,6 +4,7 @@ project(WandouPreview LANGUAGES CXX RC)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 find_package(assimp CONFIG REQUIRED)
+find_package(FFMPEG REQUIRED)
 
 add_executable(WandouModelPreview WIN32 src/ModelViewer.cpp src/ModelViewer.rc)
 target_link_libraries(WandouModelPreview PRIVATE assimp::assimp opengl32 comdlg32 shell32)
@@ -16,6 +17,9 @@ set_target_properties(ModelThumbnail PROPERTIES PREFIX "" OUTPUT_NAME "ModelThum
 
 add_executable(WandouVideoThumbnail WIN32 src/VideoThumbnail.cpp src/ModelViewer.rc)
 target_link_libraries(WandouVideoThumbnail PRIVATE mfplat mfreadwrite mfuuid propsys ole32 shell32 user32)
+target_include_directories(WandouVideoThumbnail PRIVATE ${FFMPEG_INCLUDE_DIRS})
+target_link_directories(WandouVideoThumbnail PRIVATE ${FFMPEG_LIBRARY_DIRS})
+target_link_libraries(WandouVideoThumbnail PRIVATE ${FFMPEG_LIBRARIES})
 target_compile_definitions(WandouVideoThumbnail PRIVATE UNICODE _UNICODE NOMINMAX)
 
 install(TARGETS WandouModelPreview WandouVideoThumbnail ModelThumbnail RUNTIME DESTINATION . LIBRARY DESTINATION .)

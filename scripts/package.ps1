@@ -18,7 +18,7 @@ Compress-Archive -Path $stage -DestinationPath (Join-Path $dist 'Wandou-Preview-
 # the ZIP and runs Install.ps1 invisibly, so installation takes one double-click.
 $compiler=Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319\csc.exe'
 $setupArgs=@('/nologo','/target:winexe','/platform:x64','/optimize+',('/win32icon:'+ (Join-Path $root 'assets\metal-cube.ico')),('/out:'+ (Join-Path $dist 'Wandou-Preview-0.2.0-Setup.exe')),'/reference:System.Windows.Forms.dll')
-foreach($file in @(Get-ChildItem -LiteralPath $stage -File | Where-Object {$_.Extension -in @('.exe','.dll','.ico','.ps1')})){$setupArgs+=('/resource:'+ $file.FullName +',WandouPayload.'+ $file.Name)}
+foreach($file in @(Get-ChildItem -LiteralPath $stage -File | Where-Object {$_.Extension -in @('.exe','.dll','.ico','.ps1') -or $_.Name -in @('LICENSE','THIRD-PARTY-NOTICES.md')})){$setupArgs+=('/resource:'+ $file.FullName +',WandouPayload.'+ $file.Name)}
 $setupArgs+=(Join-Path $root 'src\Setup.cs')
 & $compiler $setupArgs
 if($LASTEXITCODE -ne 0){throw 'Setup build failed'}

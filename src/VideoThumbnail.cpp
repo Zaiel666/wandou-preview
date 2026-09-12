@@ -15,7 +15,20 @@
 #include <string>
 #include <vector>
 
+extern "C" {
+#include <libavcodec/avcodec.h>
+#include <libavformat/avformat.h>
+#include <libavutil/avutil.h>
+#include <libavutil/imgutils.h>
+#include <libswscale/swscale.h>
+}
+
 template<class T> static void Release(T*& value){if(value){value->Release();value=nullptr;}}
+
+static bool WriteTopDownBmp(const std::wstring& path,const BYTE* pixels,UINT32 width,UINT32 height){
+    const size_t total=size_t(width)*height*4;BITMAPFILEHEADER fileHeader={};BITMAPINFOHEADER info={};info.biSize=sizeof(info);info.biWidth=LONG(width);info.biHeight=-LONG(height);info.biPlanes=1;info.biBitCount=32;info.biCompression=BI_RGB;info.biSizeImage=DWORD(total);fileHeader.bfType=0x4d42;fileHeader.bfOffBits=sizeof(fileHeader)+sizeof(info);fileHeader.bfSize=fileHeader.bfOffBits+DWORD(total);
+    std::ofstream output(path,std::ios::binary);if(!output)return false;output.write(reinterpret_cast<const char*>(&fileHeader),sizeof(fileHeader));output.write(reinterpret_cast<const char*>(&info),sizeof(info));output.write(reinterpret_cast<const char*>(pixels),total);return bool(output);
+}
 
 static bool SaveBmp(const std::wstring& path,IMFSample* sample,IMFMediaType* type){
     UINT32 width=0,height=0;if(FAILED(MFGetAttributeSize(type,MF_MT_FRAME_SIZE,&width,&height))||!width||!height||width>16384||height>16384)return false;
@@ -26,14 +39,30 @@ static bool SaveBmp(const std::wstring& path,IMFSample* sample,IMFMediaType* typ
     }
     if(!copied){BYTE* data=nullptr;DWORD maximum=0,current=0;if(SUCCEEDED(buffer->Lock(&data,&maximum,&current))){LONG stride=LONG(rowBytes);UINT32 stored=0;if(SUCCEEDED(type->GetUINT32(MF_MT_DEFAULT_STRIDE,&stored)))stride=LONG(stored);BYTE* first=stride<0?data+size_t(-stride)*(height-1):data;if(size_t(std::abs(stride))*height<=maximum){for(UINT32 y=0;y<height;y++)memcpy(pixels.data()+size_t(y)*rowBytes,first+ptrdiff_t(y)*stride,rowBytes);copied=true;}buffer->Unlock();}}
     Release(buffer);if(!copied)return false;
-    BITMAPFILEHEADER fileHeader={};BITMAPINFOHEADER info={};info.biSize=sizeof(info);info.biWidth=LONG(width);info.biHeight=-LONG(height);info.biPlanes=1;info.biBitCount=32;info.biCompression=BI_RGB;info.biSizeImage=DWORD(total);fileHeader.bfType=0x4d42;fileHeader.bfOffBits=sizeof(fileHeader)+sizeof(info);fileHeader.bfSize=fileHeader.bfOffBits+DWORD(total);
-    std::ofstream output(path,std::ios::binary);if(!output)return false;output.write(reinterpret_cast<const char*>(&fileHeader),sizeof(fileHeader));output.write(reinterpret_cast<const char*>(&info),sizeof(info));output.write(reinterpret_cast<const char*>(pixels.data()),pixels.size());return bool(output);
+    return WriteTopDownBmp(path,pixels.data(),width,height);
+}
+
+static std::string Utf8(const std::wstring& value){int count=WideCharToMultiByte(CP_UTF8,0,value.c_str(),-1,nullptr,0,nullptr,nullptr);std::string result(std::max(0,count),'\0');if(count>1){WideCharToMultiByte(CP_UTF8,0,value.c_str(),-1,&result[0],count,nullptr,nullptr);result.resize(count-1);}return result;}
+
+static bool ExtractFrameFfmpeg(const std::wstring& input,const std::wstring& output){
+    av_log_set_level(AV_LOG_QUIET);AVFormatContext* format=nullptr;AVCodecContext* codec=nullptr;AVPacket* packet=nullptr;AVFrame* frame=nullptr;SwsContext* scaler=nullptr;AVStream* stream=nullptr;const AVCodec* decoder=nullptr;int streamIndex=-1;bool saved=false;std::string path=Utf8(input);
+    if(avformat_open_input(&format,path.c_str(),nullptr,nullptr)<0)goto done;
+    if(avformat_find_stream_info(format,nullptr)<0)goto done;
+    streamIndex=av_find_best_stream(format,AVMEDIA_TYPE_VIDEO,-1,-1,nullptr,0);if(streamIndex<0)goto done;stream=format->streams[streamIndex];decoder=avcodec_find_decoder(stream->codecpar->codec_id);if(!decoder)goto done;
+    codec=avcodec_alloc_context3(decoder);if(!codec||avcodec_parameters_to_context(codec,stream->codecpar)<0||avcodec_open2(codec,decoder,nullptr)<0)goto done;
+    {int64_t target=0;if(stream->duration!=AV_NOPTS_VALUE&&stream->duration>0)target=stream->duration/10;else if(format->duration!=AV_NOPTS_VALUE&&format->duration>0)target=av_rescale_q(format->duration/10,AV_TIME_BASE_Q,stream->time_base);if(target>0){av_seek_frame(format,streamIndex,target,AVSEEK_FLAG_BACKWARD);avcodec_flush_buffers(codec);}}
+    packet=av_packet_alloc();frame=av_frame_alloc();if(!packet||!frame)goto done;
+    for(int attempts=0;attempts<3000&&av_read_frame(format,packet)>=0;attempts++){
+        if(packet->stream_index==streamIndex&&avcodec_send_packet(codec,packet)>=0){int decoded=avcodec_receive_frame(codec,frame);if(decoded>=0){int longest=std::max(frame->width,frame->height);double scale=longest>768?768.0/longest:1.0;int width=std::max(1,int(frame->width*scale+.5)),height=std::max(1,int(frame->height*scale+.5));std::vector<BYTE> pixels(size_t(width)*height*4);uint8_t* planes[4]={pixels.data(),nullptr,nullptr,nullptr};int strides[4]={width*4,0,0,0};scaler=sws_getContext(frame->width,frame->height,(AVPixelFormat)frame->format,width,height,AV_PIX_FMT_BGRA,SWS_BICUBIC,nullptr,nullptr,nullptr);if(scaler&&sws_scale(scaler,frame->data,frame->linesize,0,frame->height,planes,strides)>0)saved=WriteTopDownBmp(output,pixels.data(),width,height);break;}}
+        av_packet_unref(packet);
+    }
+done:
+    if(scaler)sws_freeContext(scaler);if(frame)av_frame_free(&frame);if(packet)av_packet_free(&packet);if(codec)avcodec_free_context(&codec);if(format)avformat_close_input(&format);return saved;
 }
 
 static HRESULT ExtractFrame(const std::wstring& input,const std::wstring& output){
     IMFAttributes* attributes=nullptr;IMFSourceReader* reader=nullptr;IMFMediaType* requested=nullptr;IMFMediaType* current=nullptr;IMFSample* sample=nullptr;HRESULT hr=MFCreateAttributes(&attributes,2);
     if(SUCCEEDED(hr))hr=attributes->SetUINT32(MF_SOURCE_READER_ENABLE_ADVANCED_VIDEO_PROCESSING,TRUE);
-    if(SUCCEEDED(hr))hr=attributes->SetUINT32(MF_SOURCE_READER_ENABLE_VIDEO_PROCESSING,TRUE);
     if(SUCCEEDED(hr))hr=MFCreateSourceReaderFromURL(input.c_str(),attributes,&reader);
     if(SUCCEEDED(hr))hr=reader->SetStreamSelection(MF_SOURCE_READER_ALL_STREAMS,FALSE);
     if(SUCCEEDED(hr))hr=reader->SetStreamSelection(MF_SOURCE_READER_FIRST_VIDEO_STREAM,TRUE);
@@ -52,5 +81,5 @@ static HRESULT ExtractFrame(const std::wstring& input,const std::wstring& output
 
 int WINAPI wWinMain(HINSTANCE,HINSTANCE,PWSTR,int){
     int count=0;LPWSTR* args=CommandLineToArgvW(GetCommandLineW(),&count);if(count!=3){MessageBoxW(nullptr,L"这是豌豆预览的视频缩略图后台组件。",L"豌豆预览 0.2.0",MB_ICONINFORMATION);if(args)LocalFree(args);return 0;}
-    HRESULT hr=CoInitializeEx(nullptr,COINIT_MULTITHREADED);bool com=SUCCEEDED(hr);if(hr==RPC_E_CHANGED_MODE)hr=S_OK;if(SUCCEEDED(hr))hr=MFStartup(MF_VERSION,MFSTARTUP_LITE);bool media=SUCCEEDED(hr);if(SUCCEEDED(hr))hr=ExtractFrame(args[1],args[2]);if(media)MFShutdown();if(com)CoUninitialize();LocalFree(args);return SUCCEEDED(hr)?0:1;
+    HRESULT hr=CoInitializeEx(nullptr,COINIT_MULTITHREADED);bool com=SUCCEEDED(hr);if(hr==RPC_E_CHANGED_MODE)hr=S_OK;if(SUCCEEDED(hr))hr=MFStartup(MF_VERSION,MFSTARTUP_LITE);bool media=SUCCEEDED(hr);if(SUCCEEDED(hr))hr=ExtractFrame(args[1],args[2]);if(media)MFShutdown();if(com)CoUninitialize();bool ok=SUCCEEDED(hr)||ExtractFrameFfmpeg(args[1],args[2]);LocalFree(args);return ok?0:1;
 }

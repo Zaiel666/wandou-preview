@@ -26,10 +26,10 @@ jobs:
           path: |
             C:\vcpkg\installed
             C:\vcpkg\packages
-          key: vcpkg-assimp-x64-windows-v1
+          key: vcpkg-assimp-ffmpeg-x64-windows-v1
       - name: Install model importer
         shell: cmd
-        run: vcpkg install assimp:x64-windows
+        run: vcpkg install assimp:x64-windows ffmpeg[core,avcodec,avformat,swscale]:x64-windows
       - name: Save model importer cache before compiling
         if: steps.vcpkg-cache.outputs.cache-hit != 'true'
         uses: actions/cache/save@v4
@@ -37,7 +37,7 @@ jobs:
           path: |
             C:\vcpkg\installed
             C:\vcpkg\packages
-          key: vcpkg-assimp-x64-windows-v1
+          key: vcpkg-assimp-ffmpeg-x64-windows-v1
       - name: Build thumbnail workers and Shell adapter
         shell: cmd
         run: >-

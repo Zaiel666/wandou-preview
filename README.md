@@ -24,7 +24,7 @@
 
 专用图片预览：`.c4d`、`.ai`、`.hdr`。
 
-视频格式：`.mp4`、`.avi`、`.mov`、`.m4v`、`.wmv`、`.asf`、`.mpg`、`.mpeg`、`.mpe`、`.m1v`、`.m2v`、`.ts`、`.mts`、`.m2ts`、`.mkv`、`.webm`、`.ogv`、`.flv`、`.f4v`、`.vob`、`.3gp`、`.3g2`。MP4、AVI、MOV、M4V、WMV、ASF 和 3GP 使用 Windows 原生媒体组件；其余容器能否读取取决于系统已安装的媒体扩展或编解码器。
+视频格式：`.mp4`、`.avi`、`.mov`、`.m4v`、`.wmv`、`.asf`、`.mpg`、`.mpeg`、`.mpe`、`.m1v`、`.m2v`、`.ts`、`.mts`、`.m2ts`、`.mkv`、`.webm`、`.ogv`、`.flv`、`.f4v`、`.vob`、`.3gp`、`.3g2`。程序先使用 Windows 原生媒体组件，系统缺少 HEVC 等解码器时自动切换到随安装包提供的 FFmpeg 解码组件。
 
 FBX、OBJ 等格式重点显示静态网格和基础材质颜色。动画、程序化材质、第三方渲染器节点及部分贴图不会完整还原。`.blend` 显示 Blender 保存到文件里的预览图；没有内嵌预览的文件不会生成错误画面。
 

@@ -39,7 +39,7 @@ if($Cinema4DPath){
 $backend=if($candidates.Count){$candidates[0].FullName}else{$null}
 
 New-Item -ItemType Directory -Force -Path $target | Out-Null
-foreach($from in @(Get-ChildItem -LiteralPath $PSScriptRoot -File | Where-Object {$_.Extension -in @('.exe','.dll','.ico') -or $_.Name -eq 'Uninstall.ps1'})){
+foreach($from in @(Get-ChildItem -LiteralPath $PSScriptRoot -File | Where-Object {$_.Extension -in @('.exe','.dll','.ico') -or $_.Name -in @('Uninstall.ps1','LICENSE','THIRD-PARTY-NOTICES.md')})){
     $to=Join-Path $target $from.Name
     if((Test-Path -LiteralPath $to) -and ((Get-FileHash -LiteralPath $from.FullName).Hash -eq (Get-FileHash -LiteralPath $to).Hash)){continue}
     Copy-Item -LiteralPath $from.FullName -Destination $to -Force
