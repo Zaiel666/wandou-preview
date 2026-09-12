@@ -94,9 +94,18 @@ foreach($entry in $verbEntries){
 }
 foreach($entry in @($verbEntries | Sort-Object {$_.Path.Length} -Descending)){$key=[Microsoft.Win32.Registry]::CurrentUser.OpenSubKey($entry.Path);if($key){$empty=$key.ValueCount -eq 0 -and $key.SubKeyCount -eq 0;$key.Close();if($empty){[Microsoft.Win32.Registry]::CurrentUser.DeleteSubKey($entry.Path,$false)}}}
 if($verbEntries.Count){$backup=@($backup | Where-Object {$verbEntries -notcontains $_})}
+
+# These verb names belong exclusively to this project. Delete any leftover
+# subtrees as well, including remnants from an interrupted older upgrade.
+foreach($extension in @($modelExtensions)+@('.ai','.hdr','.c4d','.blend')){
+    foreach($verbName in @('WandouPreview','ModelQuickPreview')){
+        $verb="Software\Classes\SystemFileAssociations\$extension\shell\$verbName"
+        [Microsoft.Win32.Registry]::CurrentUser.DeleteSubKeyTree($verb,$false)
+    }
+}
 foreach($change in $changes){
     $prior=@($backup | Where-Object {$_.Path -eq $change.Path -and $_.Name -eq $change.Name})
-    if($prior.Count){if($prior[0].Installed -ne $change.Value){throw '已安装的版本使用了不同设置，请先运行 Uninstall.cmd。'};continue}
+    if($prior.Count){$priorEntry=$prior | Select-Object -First 1;$priorEntry | Add-Member -NotePropertyName Installed -NotePropertyValue $change.Value -Force;continue}
     $key=[Microsoft.Win32.Registry]::CurrentUser.OpenSubKey($change.Path);$exists=$false;$value=$null;$kind='String'
     if($key){$exists=$key.GetValueNames() -contains $change.Name;if($exists){$value=$key.GetValue($change.Name,$null,[Microsoft.Win32.RegistryValueOptions]::DoNotExpandEnvironmentNames);$kind=$key.GetValueKind($change.Name).ToString()};$key.Close()}
     $backup+=[pscustomobject]@{Path=$change.Path;Name=$change.Name;Exists=$exists;Value=$value;Kind=$kind;Installed=$change.Value}

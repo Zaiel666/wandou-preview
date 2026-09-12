@@ -10,7 +10,7 @@
 const CLSID CLSID_ModelThumbnail={0x4c238e90,0xc239,0x4fe9,{0xad,0x0f,0x67,0x50,0x78,0x43,0x79,0xb2}};
 static LONG objects=0;
 
-static std::wstring Extension(const std::wstring& path){size_t dot=path.find_last_of(L'.');if(dot==std::wstring::npos)return L"3D";std::wstring e=path.substr(dot+1);for(auto& c:e)c=(wchar_t)towupper(c);return e.size()>4?L"3D":e;}
+static std::wstring Extension(const std::wstring& path){size_t dot=path.find_last_of(L'.');if(dot==std::wstring::npos)return L"3D";std::wstring e=path.substr(dot+1);for(auto& c:e)c=(wchar_t)towupper(c);return e==L"BLEND"?e:(e.size()>4?L"3D":e);}
 static void Badge(HBITMAP bitmap,const std::wstring& label){
     BITMAP info={};if(!GetObjectW(bitmap,sizeof(info),&info)||info.bmWidth<48||info.bmHeight<32)return;
     HDC dc=CreateCompatibleDC(nullptr);if(!dc)return;HGDIOBJ old=SelectObject(dc,bitmap);
