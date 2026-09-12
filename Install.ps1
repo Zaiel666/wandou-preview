@@ -12,14 +12,15 @@ foreach($legacy in @(
 }
 
 $app=Join-Path $env:LOCALAPPDATA 'WandouPreview'
-$target=Join-Path $app '0.1.0'
+$target=Join-Path $app '0.2.0'
 $stateFile=Join-Path $app 'registry-backup.json'
 $thumbnailSlot='{e357fccd-a995-4576-b01f-234630154e96}'
 $c4dClsid='{3D15370F-5744-41BF-85D8-8D4985509CEE}'
 $modelClsid='{4C238E90-C239-4FE9-AD0F-6750784379B2}'
 $modelExtensions=@('.3ds','.3mf','.dae','.dxf','.fbx','.glb','.gltf','.ifc','.lwo','.lws','.lxo','.obj','.ply','.stl','.stp','.usd','.usda','.usdc','.usdz','.x','.x3d','.x3db')
+$videoExtensions=@('.mp4','.avi','.mov','.m4v','.wmv','.asf','.mpg','.mpeg','.mpe','.m1v','.m2v','.ts','.mts','.m2ts','.mkv','.webm','.ogv','.flv','.f4v','.vob','.3gp','.3g2')
 
-foreach($name in @('WandouModelPreview.exe','ModelThumbnail.dll','WandouImagePreview.exe','C4DThumbnail.dll','metal-cube.ico')){
+foreach($name in @('WandouModelPreview.exe','WandouVideoThumbnail.exe','ModelThumbnail.dll','WandouImagePreview.exe','C4DThumbnail.dll','metal-cube.ico')){
     if(-not(Test-Path -LiteralPath (Join-Path $PSScriptRoot $name))){throw "安装包不完整：缺少 $name。请下载 Releases 中的 ZIP，不要下载 Source code。"}
 }
 
@@ -53,6 +54,9 @@ $changes=@(
     @{Path="Software\Classes\CLSID\$modelClsid\InprocServer32";Name='ThreadingModel';Value='Apartment'}
 )
 foreach($extension in $modelExtensions){
+    $changes+=@{Path="Software\Classes\$extension\shellex\$thumbnailSlot";Name='';Value=$modelClsid}
+}
+foreach($extension in $videoExtensions){
     $changes+=@{Path="Software\Classes\$extension\shellex\$thumbnailSlot";Name='';Value=$modelClsid}
 }
 
@@ -97,7 +101,7 @@ if($verbEntries.Count){$backup=@($backup | Where-Object {$verbEntries -notcontai
 
 # These verb names belong exclusively to this project. Delete any leftover
 # subtrees as well, including remnants from an interrupted older upgrade.
-foreach($extension in @($modelExtensions)+@('.ai','.hdr','.c4d','.blend')){
+foreach($extension in @($modelExtensions)+@($videoExtensions)+@('.ai','.hdr','.c4d','.blend')){
     foreach($verbName in @('WandouPreview','ModelQuickPreview')){
         $verb="Software\Classes\SystemFileAssociations\$extension\shell\$verbName"
         [Microsoft.Win32.Registry]::CurrentUser.DeleteSubKeyTree($verb,$false)
@@ -117,7 +121,7 @@ try{
 
 Add-Type -TypeDefinition 'using System;using System.Runtime.InteropServices;public static class WandouShellNotify{[DllImport("shell32.dll")]public static extern void SHChangeNotify(uint e,uint f,IntPtr a,IntPtr b);}'
 [WandouShellNotify]::SHChangeNotify(0x08000000,0x1000,[IntPtr]::Zero,[IntPtr]::Zero)
-Write-Host '豌豆预览 0.1.0 安装完成。' -ForegroundColor Green
-Write-Host '文件夹切换到“大图标”或“超大图标”，即可直接查看 C4D、Blender、FBX、OBJ 等缩略图。'
+Write-Host '豌豆预览 0.2.0 安装完成。' -ForegroundColor Green
+Write-Host '文件夹切换到“大图标”或“超大图标”，即可直接查看模型、视频和 HDR 等缩略图。'
 if($backend){Write-Host "已启用 C4D 保存预览：$backend"}else{Write-Host '未找到 Cinema 4D；FBX、OBJ 等通用模型和 AI 预览仍可使用。' -ForegroundColor Yellow}
 Write-Host '卸载时双击同一文件夹中的 Uninstall.cmd。'

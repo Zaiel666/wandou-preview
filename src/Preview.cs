@@ -208,6 +208,6 @@ static class Program {
         if(args.Length==4&&(args[0]=="--extract-ai"||args[0]=="--extract-ai-bmp")){try{Native.ExtractAi(args[1],args[2],Int32.Parse(args[3]),args[0]=="--extract-ai-bmp");return 0;}catch(Exception ex){File.WriteAllText(args[2]+".error.txt",ex.ToString());return 1;}}
         if(args.Length==4&&(args[0]=="--extract-hdr"||args[0]=="--extract-hdr-bmp")){try{Native.ExtractHdr(args[1],args[2],Int32.Parse(args[3]),args[0]=="--extract-hdr-bmp");return 0;}catch(Exception ex){File.WriteAllText(args[2]+".error.txt",ex.ToString());return 1;}}
         if(args.Length==4&&(args[0]=="--extract-blend"||args[0]=="--extract-blend-bmp")){try{Native.ExtractBlend(args[1],args[2],Int32.Parse(args[3]),args[0]=="--extract-blend-bmp");return 0;}catch(Exception ex){File.WriteAllText(args[2]+".error.txt",ex.ToString());return 1;}}
-        MessageBox.Show("这是豌豆预览的资源管理器缩略图后台组件。安装后请在文件夹中使用大图标查看文件。","豌豆预览 0.1.0");return 0;
+        MessageBox.Show("这是豌豆预览的资源管理器缩略图后台组件。安装后请在文件夹中使用大图标查看文件。","豌豆预览 0.2.0");return 0;
     }
 }

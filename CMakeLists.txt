@@ -14,4 +14,8 @@ target_link_libraries(ModelThumbnail PRIVATE ole32 gdi32 user32 advapi32 shell32
 target_compile_definitions(ModelThumbnail PRIVATE UNICODE _UNICODE NOMINMAX)
 set_target_properties(ModelThumbnail PROPERTIES PREFIX "" OUTPUT_NAME "ModelThumbnail")
 
-install(TARGETS WandouModelPreview ModelThumbnail RUNTIME DESTINATION . LIBRARY DESTINATION .)
+add_executable(WandouVideoThumbnail WIN32 src/VideoThumbnail.cpp src/ModelViewer.rc)
+target_link_libraries(WandouVideoThumbnail PRIVATE mfplat mfreadwrite mfuuid propsys ole32 shell32 user32)
+target_compile_definitions(WandouVideoThumbnail PRIVATE UNICODE _UNICODE NOMINMAX)
+
+install(TARGETS WandouModelPreview WandouVideoThumbnail ModelThumbnail RUNTIME DESTINATION . LIBRARY DESTINATION .)

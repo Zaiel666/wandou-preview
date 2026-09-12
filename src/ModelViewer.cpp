@@ -86,7 +86,7 @@ static LRESULT CALLBACK WindowProc(HWND h,UINT msg,WPARAM w,LPARAM l){
 }
 static HWND MakeWindow(HINSTANCE instance,bool hidden,int size){WNDCLASSEXW wc={sizeof(wc),CS_OWNDC|CS_DBLCLKS,WindowProc,0,0,instance,LoadIconW(instance,MAKEINTRESOURCEW(101)),LoadCursor(nullptr,IDC_ARROW),(HBRUSH)(COLOR_WINDOW+1),nullptr,L"WandouModelPreview",LoadIconW(instance,MAKEINTRESOURCEW(101))};RegisterClassExW(&wc);DWORD style=hidden?WS_POPUP:WS_OVERLAPPEDWINDOW;return CreateWindowExW(0,wc.lpszClassName,(L"豌豆预览 · "+BaseName(g.file)).c_str(),style,CW_USEDEFAULT,CW_USEDEFAULT,size,size,nullptr,nullptr,instance,nullptr);}
 int WINAPI wWinMain(HINSTANCE instance,HINSTANCE,PWSTR,int){
-    int count=0;LPWSTR* args=CommandLineToArgvW(GetCommandLineW(),&count);if(count<5||std::wstring(args[1])!=L"--render"){MessageBoxW(nullptr,L"这是豌豆预览的资源管理器缩略图后台组件。安装后请在文件夹中使用大图标查看模型。",L"豌豆预览 0.1.0",MB_ICONINFORMATION);if(args)LocalFree(args);return 0;}
+    int count=0;LPWSTR* args=CommandLineToArgvW(GetCommandLineW(),&count);if(count<5||std::wstring(args[1])!=L"--render"){MessageBoxW(nullptr,L"这是豌豆预览的资源管理器缩略图后台组件。安装后请在文件夹中使用大图标查看模型。",L"豌豆预览 0.2.0",MB_ICONINFORMATION);if(args)LocalFree(args);return 0;}
     g.file=args[2];std::wstring output=args[3];int size=std::max(64,std::min(1024,_wtoi(args[4])));
     if(!LoadModel(g.file)){LocalFree(args);return 2;}
     HWND window=MakeWindow(instance,true,size);if(!window){LocalFree(args);return 3;}g.window=window;g.ready=true;wglMakeCurrent(g.dc,g.gl);
