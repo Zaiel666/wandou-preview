@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.IO.Compression;
 using System.Drawing;
 using System.Drawing.Imaging;
 using System.Diagnostics;
@@ -9,6 +10,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
+using System.Threading;
 using System.Windows.Forms;
 
 [ComImport, Guid("00000001-0000-0000-C000-000000000046"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
@@ -27,6 +29,7 @@ static class Native {
     [DllImport("gdi32")] public static extern bool DeleteObject(IntPtr obj);
     [DllImport("shlwapi", CharSet=CharSet.Unicode, PreserveSig=true)] public static extern int SHCreateStreamOnFileEx(string path, uint mode, uint attributes, bool create, IntPtr reserved, out IStream stream);
     [DllImport("shell32", CharSet=CharSet.Unicode, PreserveSig=true)] public static extern int SHCreateItemFromParsingName(string path, IntPtr context, ref Guid iid, [MarshalAs(UnmanagedType.Interface)] out IShellItemImageFactory item);
+    [DllImport("shell32", CharSet=CharSet.Unicode)] public static extern void SHChangeNotify(uint eventId, uint flags, IntPtr item1, IntPtr item2);
     [UnmanagedFunctionPointer(CallingConvention.StdCall)] public delegate int Factory(ref Guid clsid, ref Guid iid, out IntPtr result);
 
     public static void ExtractC4D(string dll, string file, string output, bool bmp) {
@@ -117,6 +120,53 @@ static class Native {
             Marshal.Copy(pixels,0,data.Scan0,pixels.Length);image.UnlockBits(data);image.Save(output,bmp?ImageFormat.Bmp:ImageFormat.Png);
         }
     }
+
+    static int ReadBlendInt(byte[] bytes,int offset,bool bigEndian) {
+        if(bigEndian)return (bytes[offset]<<24)|(bytes[offset+1]<<16)|(bytes[offset+2]<<8)|bytes[offset+3];
+        return bytes[offset]|(bytes[offset+1]<<8)|(bytes[offset+2]<<16)|(bytes[offset+3]<<24);
+    }
+
+    static byte[] ReadExact(Stream input,int length) {
+        byte[] result=new byte[length];int offset=0;
+        while(offset<length){int count=input.Read(result,offset,length-offset);if(count<=0)throw new EndOfStreamException();offset+=count;}
+        return result;
+    }
+
+    static void SkipExact(Stream input,int length) {
+        byte[] buffer=new byte[65536];int remaining=length;
+        while(remaining>0){int count=input.Read(buffer,0,Math.Min(buffer.Length,remaining));if(count<=0)throw new EndOfStreamException();remaining-=count;}
+    }
+
+    public static void ExtractBlend(string file,string output,int requestedSize,bool bmp) {
+        Stream source=File.OpenRead(file),input=source;
+        try {
+            byte[] first=ReadExact(source,2);source.Position=0;
+            if(first[0]==0x1f&&first[1]==0x8b)input=new GZipStream(source,CompressionMode.Decompress,false);
+            byte[] header=ReadExact(input,12);
+            if(Encoding.ASCII.GetString(header,0,7)!="BLENDER")throw new Exception("不是有效的 Blender 文件。");
+            bool pointer64=header[7]==(byte)'-',bigEndian=header[8]==(byte)'V';int blockHeaderSize=pointer64?24:20;
+            byte[] pixels=null;int width=0,height=0;
+            while(true){
+                byte[] block=ReadExact(input,blockHeaderSize);string code=Encoding.ASCII.GetString(block,0,4);int length=ReadBlendInt(block,4,bigEndian);
+                if(length<0||length>1024*1024*1024)throw new Exception("Blender 文件块尺寸无效。");
+                if(code=="REND"){SkipExact(input,length);continue;}
+                if(code!="TEST")throw new Exception("这个 Blender 文件没有保存内嵌预览图，请在 Blender 中保存一次后重试。");
+                if(length<8)throw new Exception("Blender 预览数据不完整。");byte[] dimensions=ReadExact(input,8);width=ReadBlendInt(dimensions,0,bigEndian);height=ReadBlendInt(dimensions,4,bigEndian);
+                long expected=(long)width*height*4;if(width<1||height<1||width>8192||height>8192||expected!=length-8)throw new Exception("Blender 预览图尺寸无效。");pixels=ReadExact(input,(int)expected);break;
+            }
+            using(var original=new Bitmap(width,height,PixelFormat.Format32bppArgb)){
+                var data=original.LockBits(new Rectangle(0,0,width,height),ImageLockMode.WriteOnly,PixelFormat.Format32bppArgb);byte[] row=new byte[width*4];
+                try{for(int y=0;y<height;y++){int sourceRow=(height-1-y)*width*4;for(int x=0;x<width;x++){int s=sourceRow+x*4,d=x*4;row[d]=pixels[s+2];row[d+1]=pixels[s+1];row[d+2]=pixels[s];row[d+3]=pixels[s+3];}Marshal.Copy(row,0,IntPtr.Add(data.Scan0,y*data.Stride),row.Length);}}finally{original.UnlockBits(data);}
+                int maxSize=Math.Max(128,Math.Min(1024,requestedSize));double scale=Math.Min(1.0,Math.Min((double)maxSize/width,(double)maxSize/height));int outWidth=Math.Max(1,(int)Math.Round(width*scale)),outHeight=Math.Max(1,(int)Math.Round(height*scale));
+                using(var result=new Bitmap(outWidth,outHeight,PixelFormat.Format32bppArgb)){using(var graphics=Graphics.FromImage(result)){graphics.CompositingMode=System.Drawing.Drawing2D.CompositingMode.SourceCopy;graphics.InterpolationMode=System.Drawing.Drawing2D.InterpolationMode.HighQualityBicubic;graphics.DrawImage(original,0,0,outWidth,outHeight);}result.Save(output,bmp?ImageFormat.Bmp:ImageFormat.Png);}
+            }
+        } finally {if(input!=source)input.Dispose();else source.Dispose();}
+    }
+
+    public static void RefreshAssociations() {
+        Thread.Sleep(3500);
+        SHChangeNotify(0x08000000,0x1000,IntPtr.Zero,IntPtr.Zero);
+    }
 }
 
 class PreviewWindow : Form {
@@ -153,9 +203,11 @@ class PreviewWindow : Form {
 
 static class Program {
     [STAThread] static int Main(string[] args) {
+        if(args.Length==1&&args[0]=="--refresh-associations"){try{Native.RefreshAssociations();return 0;}catch{return 1;}}
         if(args.Length==4&&(args[0]=="--extract"||args[0]=="--extract-bmp")){try{Native.ExtractC4D(args[1],args[2],args[3],args[0]=="--extract-bmp");return 0;}catch(Exception ex){File.WriteAllText(args[3]+".error.txt",ex.ToString());return 1;}}
         if(args.Length==4&&(args[0]=="--extract-ai"||args[0]=="--extract-ai-bmp")){try{Native.ExtractAi(args[1],args[2],Int32.Parse(args[3]),args[0]=="--extract-ai-bmp");return 0;}catch(Exception ex){File.WriteAllText(args[2]+".error.txt",ex.ToString());return 1;}}
         if(args.Length==4&&(args[0]=="--extract-hdr"||args[0]=="--extract-hdr-bmp")){try{Native.ExtractHdr(args[1],args[2],Int32.Parse(args[3]),args[0]=="--extract-hdr-bmp");return 0;}catch(Exception ex){File.WriteAllText(args[2]+".error.txt",ex.ToString());return 1;}}
-        Application.EnableVisualStyles();Application.SetCompatibleTextRenderingDefault(false);if(args.Length!=1){MessageBox.Show("请在资源管理器中右键 C4D、AI 或 HDR 文件，选择“豌豆预览”。","豌豆预览 0.1.0");return 0;}try{Application.Run(new PreviewWindow(args[0]));return 0;}catch(Exception ex){MessageBox.Show(ex.Message,"豌豆预览 0.1.0");return 1;}
+        if(args.Length==4&&(args[0]=="--extract-blend"||args[0]=="--extract-blend-bmp")){try{Native.ExtractBlend(args[1],args[2],Int32.Parse(args[3]),args[0]=="--extract-blend-bmp");return 0;}catch(Exception ex){File.WriteAllText(args[2]+".error.txt",ex.ToString());return 1;}}
+        MessageBox.Show("这是豌豆预览的资源管理器缩略图后台组件。安装后请在文件夹中使用大图标查看文件。","豌豆预览 0.1.0");return 0;
     }
 }

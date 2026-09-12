@@ -4,7 +4,7 @@ $stateFile=Join-Path $app 'registry-backup.json'
 if(-not(Test-Path -LiteralPath $stateFile)){Write-Host '没有找到豌豆预览的安装记录。';exit 0}
 $backup=Get-Content -LiteralPath $stateFile -Raw | ConvertFrom-Json
 foreach($entry in $backup){
-    if(-not($entry.Path -like 'Software\Classes\*' -or $entry.Path -eq 'Software\WandouPreview')){throw '安装备份包含意外的注册表路径。'}
+    if(-not($entry.Path -like 'Software\Classes\*' -or $entry.Path -eq 'Software\WandouPreview' -or $entry.Path -eq 'Software\Microsoft\Windows\CurrentVersion\Run')){throw '安装备份包含意外的注册表路径。'}
     $key=[Microsoft.Win32.Registry]::CurrentUser.OpenSubKey($entry.Path,$true);if(-not $key){continue}
     try{$current=$key.GetValue($entry.Name,$null,[Microsoft.Win32.RegistryValueOptions]::DoNotExpandEnvironmentNames);if($current -ne $entry.Installed){Write-Host "保留其他软件后来修改的设置：$($entry.Path)";continue};if($entry.Exists){$kind=[Microsoft.Win32.RegistryValueKind]::$($entry.Kind);$key.SetValue($entry.Name,$entry.Value,$kind)}else{$key.DeleteValue($entry.Name,$false)}}finally{$key.Close()}
 }

@@ -44,8 +44,9 @@ foreach($from in @(Get-ChildItem -LiteralPath $PSScriptRoot -File | Where-Object
     Copy-Item -LiteralPath $from.FullName -Destination $to -Force
 }
 
-$icon=Join-Path $target 'metal-cube.ico';$modelExe=Join-Path $target 'WandouModelPreview.exe';$imageExe=Join-Path $target 'WandouImagePreview.exe'
+$imageExe=Join-Path $target 'WandouImagePreview.exe'
 $changes=@(
+    @{Path='Software\Microsoft\Windows\CurrentVersion\Run';Name='WandouPreviewRefresh';Value=('"'+$imageExe+'" --refresh-associations')},
     @{Path="Software\Classes\CLSID\$modelClsid";Name='';Value='Wandou Preview Thumbnail'},
     @{Path="Software\Classes\CLSID\$modelClsid";Name='DisableProcessIsolation';Value=1;Kind='DWord'},
     @{Path="Software\Classes\CLSID\$modelClsid\InprocServer32";Name='';Value=(Join-Path $target 'ModelThumbnail.dll')},
@@ -53,24 +54,15 @@ $changes=@(
 )
 foreach($extension in $modelExtensions){
     $changes+=@{Path="Software\Classes\$extension\shellex\$thumbnailSlot";Name='';Value=$modelClsid}
-    $verb="Software\Classes\SystemFileAssociations\$extension\shell\WandouPreview"
-    $changes+=@{Path=$verb;Name='';Value='3D 模型快速预览'}
-    $changes+=@{Path=$verb;Name='Icon';Value=$icon}
-    $changes+=@{Path="$verb\command";Name='';Value=('"'+$modelExe+'" "%1"')}
 }
 
 # Illustrator files saved with PDF compatibility can be rendered without Illustrator.
 $changes+=@(
     @{Path="Software\Classes\.ai\shellex\$thumbnailSlot";Name='';Value=$modelClsid},
-    @{Path='Software\Classes\SystemFileAssociations\.ai\shell\WandouPreview';Name='';Value='豌豆预览（AI）'},
-    @{Path='Software\Classes\SystemFileAssociations\.ai\shell\WandouPreview';Name='Icon';Value=$icon},
-    @{Path='Software\Classes\SystemFileAssociations\.ai\shell\WandouPreview\command';Name='';Value=('"'+$imageExe+'" "%1"')}
+    @{Path="Software\Classes\.blend\shellex\$thumbnailSlot";Name='';Value=$modelClsid}
 )
 $changes+=@(
-    @{Path="Software\Classes\.hdr\shellex\$thumbnailSlot";Name='';Value=$modelClsid},
-    @{Path='Software\Classes\SystemFileAssociations\.hdr\shell\WandouPreview';Name='';Value='豌豆预览（HDR）'},
-    @{Path='Software\Classes\SystemFileAssociations\.hdr\shell\WandouPreview';Name='Icon';Value=$icon},
-    @{Path='Software\Classes\SystemFileAssociations\.hdr\shell\WandouPreview\command';Name='';Value=('"'+$imageExe+'" "%1"')}
+    @{Path="Software\Classes\.hdr\shellex\$thumbnailSlot";Name='';Value=$modelClsid}
 )
 
 if($backend){
@@ -81,16 +73,27 @@ if($backend){
         @{Path="Software\Classes\CLSID\$c4dClsid";Name='DisableProcessIsolation';Value=1;Kind='DWord'},
         @{Path="Software\Classes\CLSID\$c4dClsid\InprocServer32";Name='';Value=(Join-Path $target 'C4DThumbnail.dll')},
         @{Path="Software\Classes\CLSID\$c4dClsid\InprocServer32";Name='ThreadingModel';Value='Apartment'},
-        @{Path="Software\Classes\.c4d\shellex\$thumbnailSlot";Name='';Value=$c4dClsid},
-        @{Path='Software\Classes\SystemFileAssociations\.c4d\shell\WandouPreview';Name='';Value='豌豆预览（C4D）'},
-        @{Path='Software\Classes\SystemFileAssociations\.c4d\shell\WandouPreview';Name='Icon';Value=$icon},
-        @{Path='Software\Classes\SystemFileAssociations\.c4d\shell\WandouPreview\command';Name='';Value=('"'+$imageExe+'" "%1"')}
+        @{Path="Software\Classes\.c4d\shellex\$thumbnailSlot";Name='';Value=$c4dClsid}
     )
     $extensionKey=[Microsoft.Win32.Registry]::ClassesRoot.OpenSubKey('.c4d')
     if($extensionKey){$progId=$extensionKey.GetValue('');$extensionKey.Close();if($progId){$changes+=@{Path="Software\Classes\$progId\shellex\$thumbnailSlot";Name='';Value=$c4dClsid}}}
 }
 
-$backup=@();if(Test-Path -LiteralPath $stateFile){$backup=Get-Content -LiteralPath $stateFile -Raw | ConvertFrom-Json}
+$backup=@();if(Test-Path -LiteralPath $stateFile){$backup=@(Get-Content -LiteralPath $stateFile -Raw | ConvertFrom-Json)}
+
+# Versions before this one registered preview verbs. Restore the settings that
+# existed before Wandou Preview installed them, then remove those records from
+# our state file. The product is thumbnail-only now.
+$verbEntries=@($backup | Where-Object {$_.Path -match '^Software\\Classes\\SystemFileAssociations\\[^\\]+\\shell\\(WandouPreview|ModelQuickPreview)(\\|$)'})
+foreach($entry in $verbEntries){
+    $key=[Microsoft.Win32.Registry]::CurrentUser.OpenSubKey($entry.Path,$true);if(-not $key){continue}
+    try{
+        $current=$key.GetValue($entry.Name,$null,[Microsoft.Win32.RegistryValueOptions]::DoNotExpandEnvironmentNames)
+        if($current -eq $entry.Installed){if($entry.Exists){$kind=[Microsoft.Win32.RegistryValueKind]::$($entry.Kind);$key.SetValue($entry.Name,$entry.Value,$kind)}else{$key.DeleteValue($entry.Name,$false)}}
+    }finally{$key.Close()}
+}
+foreach($entry in @($verbEntries | Sort-Object {$_.Path.Length} -Descending)){$key=[Microsoft.Win32.Registry]::CurrentUser.OpenSubKey($entry.Path);if($key){$empty=$key.ValueCount -eq 0 -and $key.SubKeyCount -eq 0;$key.Close();if($empty){[Microsoft.Win32.Registry]::CurrentUser.DeleteSubKey($entry.Path,$false)}}}
+if($verbEntries.Count){$backup=@($backup | Where-Object {$verbEntries -notcontains $_})}
 foreach($change in $changes){
     $prior=@($backup | Where-Object {$_.Path -eq $change.Path -and $_.Name -eq $change.Name})
     if($prior.Count){if($prior[0].Installed -ne $change.Value){throw '已安装的版本使用了不同设置，请先运行 Uninstall.cmd。'};continue}
@@ -106,7 +109,6 @@ try{
 Add-Type -TypeDefinition 'using System;using System.Runtime.InteropServices;public static class WandouShellNotify{[DllImport("shell32.dll")]public static extern void SHChangeNotify(uint e,uint f,IntPtr a,IntPtr b);}'
 [WandouShellNotify]::SHChangeNotify(0x08000000,0x1000,[IntPtr]::Zero,[IntPtr]::Zero)
 Write-Host '豌豆预览 0.1.0 安装完成。' -ForegroundColor Green
-Write-Host '文件夹切换到“大图标”或“超大图标”即可查看缩略图；右键模型可旋转、缩放。'
-Write-Host 'Windows 11 首次使用可能需要点“显示更多选项”。'
+Write-Host '文件夹切换到“大图标”或“超大图标”，即可直接查看 C4D、Blender、FBX、OBJ 等缩略图。'
 if($backend){Write-Host "已启用 C4D 保存预览：$backend"}else{Write-Host '未找到 Cinema 4D；FBX、OBJ 等通用模型和 AI 预览仍可使用。' -ForegroundColor Yellow}
 Write-Host '卸载时双击同一文件夹中的 Uninstall.cmd。'
