@@ -29,7 +29,7 @@ jobs:
           key: vcpkg-assimp-ffmpeg-x64-windows-v1
       - name: Install model importer
         shell: cmd
-        run: vcpkg install assimp:x64-windows ffmpeg[core,avcodec,avformat,swscale,dav1d]:x64-windows
+        run: vcpkg install assimp:x64-windows ffmpeg[core,avcodec,avformat,swscale,dav1d]:x64-windows --recurse
       - name: Save model importer cache before compiling
         if: steps.vcpkg-cache.outputs.cache-hit != 'true'
         uses: actions/cache/save@v4
