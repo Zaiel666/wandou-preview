@@ -138,6 +138,7 @@ try{
 
 Add-Type -TypeDefinition 'using System;using System.Runtime.InteropServices;public static class WandouShellNotify{[DllImport("shell32.dll")]public static extern void SHChangeNotify(uint e,uint f,IntPtr a,IntPtr b);}'
 [WandouShellNotify]::SHChangeNotify(0x08000000,0x1000,[IntPtr]::Zero,[IntPtr]::Zero)
+Start-Process -FilePath $imageExe -ArgumentList '--refresh-associations' -WindowStyle Hidden
 Write-Host '豌豆预览 0.2.0 安装完成。' -ForegroundColor Green
 Write-Host '文件夹切换到“大图标”或“超大图标”，即可直接查看模型、视频和 HDR 等缩略图。'
 if($backend){Write-Host "已启用 C4D 保存预览：$backend"}else{Write-Host '未找到 Cinema 4D；FBX、OBJ 等通用模型和 AI 预览仍可使用。' -ForegroundColor Yellow}

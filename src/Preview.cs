@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.IO.Compression;
 using System.Drawing;
@@ -30,6 +31,7 @@ static class Native {
     [DllImport("shlwapi", CharSet=CharSet.Unicode, PreserveSig=true)] public static extern int SHCreateStreamOnFileEx(string path, uint mode, uint attributes, bool create, IntPtr reserved, out IStream stream);
     [DllImport("shell32", CharSet=CharSet.Unicode, PreserveSig=true)] public static extern int SHCreateItemFromParsingName(string path, IntPtr context, ref Guid iid, [MarshalAs(UnmanagedType.Interface)] out IShellItemImageFactory item);
     [DllImport("shell32", CharSet=CharSet.Unicode)] public static extern void SHChangeNotify(uint eventId, uint flags, IntPtr item1, IntPtr item2);
+    [DllImport("shell32", CharSet=CharSet.Unicode, EntryPoint="SHChangeNotify")] public static extern void SHChangeNotifyPath(uint eventId, uint flags, string item1, IntPtr item2);
     [UnmanagedFunctionPointer(CallingConvention.StdCall)] public delegate int Factory(ref Guid clsid, ref Guid iid, out IntPtr result);
 
     public static void ExtractC4D(string dll, string file, string output, bool bmp) {
@@ -166,6 +168,18 @@ static class Native {
     public static void RefreshAssociations() {
         Thread.Sleep(3500);
         SHChangeNotify(0x08000000,0x1000,IntPtr.Zero,IntPtr.Zero);
+        var extensions=new HashSet<string>(StringComparer.OrdinalIgnoreCase){
+            ".3ds",".3mf",".dae",".dxf",".fbx",".glb",".gltf",".ifc",".lwo",".lws",".lxo",".obj",".ply",".stl",".stp",".usd",".usda",".usdc",".usdz",".x",".x3d",".x3db",
+            ".c4d",".blend",".ai",".hdr",
+            ".mp4",".avi",".mov",".m4v",".wmv",".asf",".mpg",".mpeg",".mpe",".m1v",".m2v",".ts",".mts",".m2ts",".mkv",".webm",".ogv",".flv",".f4v",".vob",".3gp",".3g2"
+        };
+        string profile=Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+        string[] roots={Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory),Path.Combine(profile,"Downloads"),Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),Environment.GetFolderPath(Environment.SpecialFolder.MyVideos)};
+        var visited=new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach(string root in roots){
+            if(String.IsNullOrEmpty(root)||!Directory.Exists(root)||!visited.Add(root))continue;
+            try{int count=0;foreach(string file in Directory.EnumerateFiles(root,"*.*",SearchOption.AllDirectories)){if(!extensions.Contains(Path.GetExtension(file)))continue;SHChangeNotifyPath(0x00002000,0x0005,file,IntPtr.Zero);if(++count>=10000)break;}SHChangeNotifyPath(0x00001000,0x0005,root,IntPtr.Zero);}catch{}
+        }
     }
 }
 
