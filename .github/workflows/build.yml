@@ -26,7 +26,7 @@ jobs:
           path: |
             C:\vcpkg\installed
             C:\vcpkg\packages
-          key: vcpkg-assimp-ffmpeg-dav1d-x64-windows-v1
+          key: vcpkg-assimp-ffmpeg-x64-windows-v1
       - name: Install model importer
         shell: cmd
         run: vcpkg install assimp:x64-windows ffmpeg[core,avcodec,avformat,swscale,dav1d]:x64-windows
@@ -37,7 +37,7 @@ jobs:
           path: |
             C:\vcpkg\installed
             C:\vcpkg\packages
-          key: vcpkg-assimp-ffmpeg-dav1d-x64-windows-v1
+          key: vcpkg-assimp-ffmpeg-x64-windows-v1
       - name: Build thumbnail workers and Shell adapter
         shell: cmd
         run: >-
