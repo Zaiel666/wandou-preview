@@ -28,7 +28,7 @@ $thumbnailSlot='{e357fccd-a995-4576-b01f-234630154e96}'
 $c4dClsid='{3D15370F-5744-41BF-85D8-8D4985509CEE}'
 $modelClsid='{4C238E90-C239-4FE9-AD0F-6750784379B2}'
 $modelExtensions=@('.3ds','.3mf','.dae','.dxf','.fbx','.glb','.gltf','.ifc','.lwo','.lws','.lxo','.obj','.ply','.stl','.stp','.usd','.usda','.usdc','.usdz','.x','.x3d','.x3db')
-$videoExtensions=@('.mp4','.avi','.mov','.m4v','.wmv','.asf','.mpg','.mpeg','.mpe','.m1v','.m2v','.ts','.mts','.m2ts','.mkv','.webm','.ogv','.flv','.f4v','.vob','.3gp','.3g2')
+$videoExtensions=@('.mp4','.avi','.mov','.m4v','.wmv','.asf','.mpg','.mpeg','.mpe','.m1v','.m2v','.mts','.m2ts','.mkv','.webm','.ogv','.flv','.f4v','.vob','.3gp','.3g2')
 
 foreach($name in @('WandouModelPreview.exe','WandouVideoThumbnail.exe','ModelThumbnail.dll','WandouImagePreview.exe','C4DThumbnail.dll','metal-cube.ico')){
     if(-not(Test-Path -LiteralPath (Join-Path $PSScriptRoot $name))){throw "安装包不完整：缺少 $name。请下载 Releases 中的 ZIP，不要下载 Source code。"}
@@ -101,6 +101,16 @@ if($backend){
 }
 
 $backup=@();if(Test-Path -LiteralPath $stateFile){$backup=@(Get-Content -LiteralPath $stateFile -Raw | ConvertFrom-Json)}
+
+# .ts is overwhelmingly used for TypeScript source code on developer machines.
+# Older builds registered it as MPEG transport stream video, which could make a
+# login refresh inspect thousands of source files before reaching real videos.
+$retiredTs=@($backup | Where-Object {$_.Path -eq "Software\Classes\.ts\shellex\$thumbnailSlot"})
+foreach($entry in $retiredTs){
+    $key=[Microsoft.Win32.Registry]::CurrentUser.OpenSubKey($entry.Path,$true);if(-not $key){continue}
+    try{$current=$key.GetValue($entry.Name,$null,[Microsoft.Win32.RegistryValueOptions]::DoNotExpandEnvironmentNames);if($current -eq $entry.Installed){if($entry.Exists){$kind=[Microsoft.Win32.RegistryValueKind]::$($entry.Kind);$key.SetValue($entry.Name,$entry.Value,$kind)}else{$key.DeleteValue($entry.Name,$false)}}}finally{$key.Close()}
+}
+if($retiredTs.Count){$backup=@($backup | Where-Object {$retiredTs -notcontains $_})}
 
 # Versions before this one registered preview verbs. Restore the settings that
 # existed before Wandou Preview installed them, then remove those records from

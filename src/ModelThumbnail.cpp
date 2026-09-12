@@ -11,7 +11,7 @@ const CLSID CLSID_ModelThumbnail={0x4c238e90,0xc239,0x4fe9,{0xad,0x0f,0x67,0x50,
 static LONG objects=0;
 
 static std::wstring Extension(const std::wstring& path){size_t dot=path.find_last_of(L'.');if(dot==std::wstring::npos)return L"3D";std::wstring e=path.substr(dot+1);for(auto& c:e)c=(wchar_t)towupper(c);return e==L"BLEND"?e:(e.size()>4?L"3D":e);}
-static bool IsVideo(const std::wstring& extension){return extension==L"MP4"||extension==L"AVI"||extension==L"MOV"||extension==L"M4V"||extension==L"WMV"||extension==L"ASF"||extension==L"MPG"||extension==L"MPEG"||extension==L"MPE"||extension==L"M1V"||extension==L"M2V"||extension==L"TS"||extension==L"MTS"||extension==L"M2TS"||extension==L"MKV"||extension==L"WEBM"||extension==L"OGV"||extension==L"FLV"||extension==L"F4V"||extension==L"VOB"||extension==L"3GP"||extension==L"3G2";}
+static bool IsVideo(const std::wstring& extension){return extension==L"MP4"||extension==L"AVI"||extension==L"MOV"||extension==L"M4V"||extension==L"WMV"||extension==L"ASF"||extension==L"MPG"||extension==L"MPEG"||extension==L"MPE"||extension==L"M1V"||extension==L"M2V"||extension==L"MTS"||extension==L"M2TS"||extension==L"MKV"||extension==L"WEBM"||extension==L"OGV"||extension==L"FLV"||extension==L"F4V"||extension==L"VOB"||extension==L"3GP"||extension==L"3G2";}
 static void Badge(HBITMAP bitmap,const std::wstring& label){
     BITMAP info={};if(!GetObjectW(bitmap,sizeof(info),&info)||info.bmWidth<48||info.bmHeight<32)return;
     HDC dc=CreateCompatibleDC(nullptr);if(!dc)return;HGDIOBJ old=SelectObject(dc,bitmap);

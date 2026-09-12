@@ -171,14 +171,19 @@ static class Native {
         var extensions=new HashSet<string>(StringComparer.OrdinalIgnoreCase){
             ".3ds",".3mf",".dae",".dxf",".fbx",".glb",".gltf",".ifc",".lwo",".lws",".lxo",".obj",".ply",".stl",".stp",".usd",".usda",".usdc",".usdz",".x",".x3d",".x3db",
             ".c4d",".blend",".ai",".hdr",
-            ".mp4",".avi",".mov",".m4v",".wmv",".asf",".mpg",".mpeg",".mpe",".m1v",".m2v",".ts",".mts",".m2ts",".mkv",".webm",".ogv",".flv",".f4v",".vob",".3gp",".3g2"
+            ".mp4",".avi",".mov",".m4v",".wmv",".asf",".mpg",".mpeg",".mpe",".m1v",".m2v",".mts",".m2ts",".mkv",".webm",".ogv",".flv",".f4v",".vob",".3gp",".3g2"
         };
         string profile=Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
         string[] roots={Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory),Path.Combine(profile,"Downloads"),Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),Environment.GetFolderPath(Environment.SpecialFolder.MyVideos)};
         var visited=new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach(string root in roots){
             if(String.IsNullOrEmpty(root)||!Directory.Exists(root)||!visited.Add(root))continue;
-            try{int count=0;foreach(string file in Directory.EnumerateFiles(root,"*.*",SearchOption.AllDirectories)){if(!extensions.Contains(Path.GetExtension(file)))continue;SHChangeNotifyPath(0x00002000,0x0005,file,IntPtr.Zero);if(++count>=10000)break;}SHChangeNotifyPath(0x00001000,0x0005,root,IntPtr.Zero);}catch{}
+            try{
+                int files=0,directories=0;var pending=new Queue<KeyValuePair<string,int>>();pending.Enqueue(new KeyValuePair<string,int>(root,0));
+                while(pending.Count>0&&files<10000&&directories<2000){var item=pending.Dequeue();directories++;try{foreach(string file in Directory.EnumerateFiles(item.Key,"*.*",SearchOption.TopDirectoryOnly)){if(!extensions.Contains(Path.GetExtension(file)))continue;SHChangeNotifyPath(0x00002000,0x0005,file,IntPtr.Zero);if(++files>=10000)break;}if(item.Value<3)foreach(string directory in Directory.EnumerateDirectories(item.Key,"*",SearchOption.TopDirectoryOnly)){string name=Path.GetFileName(directory);if(name.Equals("node_modules",StringComparison.OrdinalIgnoreCase)||name.Equals(".git",StringComparison.OrdinalIgnoreCase)||name.StartsWith("."))continue;pending.Enqueue(new KeyValuePair<string,int>(directory,item.Value+1));}}catch{}
+                }
+                SHChangeNotifyPath(0x00001000,0x0005,root,IntPtr.Zero);
+            }catch{}
         }
     }
 }
