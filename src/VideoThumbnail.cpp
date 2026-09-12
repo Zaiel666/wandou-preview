@@ -26,6 +26,7 @@ extern "C" {
 template<class T> static void Release(T*& value){if(value){value->Release();value=nullptr;}}
 
 static bool WriteBmp(const std::wstring& path,const BYTE* pixels,UINT32 width,UINT32 height){
+    std::vector<BYTE> reduced;UINT32 longest=std::max(width,height);if(longest>768){UINT32 sourceWidth=width,sourceHeight=height;double ratio=768.0/longest;width=std::max(1u,UINT32(sourceWidth*ratio+.5));height=std::max(1u,UINT32(sourceHeight*ratio+.5));reduced.resize(size_t(width)*height*4);for(UINT32 y=0;y<height;y++){UINT32 sy=std::min(sourceHeight-1,UINT32(uint64_t(y)*sourceHeight/height));for(UINT32 x=0;x<width;x++){UINT32 sx=std::min(sourceWidth-1,UINT32(uint64_t(x)*sourceWidth/width));memcpy(reduced.data()+(size_t(y)*width+x)*4,pixels+(size_t(sy)*sourceWidth+sx)*4,4);}}pixels=reduced.data();}
     const size_t rowBytes=size_t(width)*4,total=rowBytes*height;BITMAPFILEHEADER fileHeader={};BITMAPINFOHEADER info={};info.biSize=sizeof(info);info.biWidth=LONG(width);info.biHeight=LONG(height);info.biPlanes=1;info.biBitCount=32;info.biCompression=BI_RGB;info.biSizeImage=DWORD(total);fileHeader.bfType=0x4d42;fileHeader.bfOffBits=sizeof(fileHeader)+sizeof(info);fileHeader.bfSize=fileHeader.bfOffBits+DWORD(total);
     std::ofstream output(path,std::ios::binary);if(!output)return false;output.write(reinterpret_cast<const char*>(&fileHeader),sizeof(fileHeader));output.write(reinterpret_cast<const char*>(&info),sizeof(info));for(UINT32 y=height;y>0;y--)output.write(reinterpret_cast<const char*>(pixels+size_t(y-1)*rowBytes),rowBytes);return bool(output);
 }

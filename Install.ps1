@@ -111,6 +111,9 @@ foreach($entry in $retiredTs){
     try{$current=$key.GetValue($entry.Name,$null,[Microsoft.Win32.RegistryValueOptions]::DoNotExpandEnvironmentNames);if($current -eq $entry.Installed){if($entry.Exists){$kind=[Microsoft.Win32.RegistryValueKind]::$($entry.Kind);$key.SetValue($entry.Name,$entry.Value,$kind)}else{$key.DeleteValue($entry.Name,$false)}}}finally{$key.Close()}
 }
 if($retiredTs.Count){$backup=@($backup | Where-Object {$retiredTs -notcontains $_})}
+$tsPath="Software\Classes\.ts\shellex\$thumbnailSlot"
+$tsKey=[Microsoft.Win32.Registry]::CurrentUser.OpenSubKey($tsPath,$true)
+if($tsKey){try{if($tsKey.GetValue('',$null,[Microsoft.Win32.RegistryValueOptions]::DoNotExpandEnvironmentNames) -eq $modelClsid){$tsKey.DeleteValue('',$false)}}finally{$tsKey.Close()};$tsKey=[Microsoft.Win32.Registry]::CurrentUser.OpenSubKey($tsPath);if($tsKey){$empty=$tsKey.ValueCount -eq 0 -and $tsKey.SubKeyCount -eq 0;$tsKey.Close();if($empty){[Microsoft.Win32.Registry]::CurrentUser.DeleteSubKey($tsPath,$false)}}}
 
 # Versions before this one registered preview verbs. Restore the settings that
 # existed before Wandou Preview installed them, then remove those records from
