@@ -58,6 +58,13 @@ foreach($from in @(Get-ChildItem -LiteralPath $PSScriptRoot -File | Where-Object
 $imageExe=Join-Path $target 'WandouImagePreview.exe'
 $changes=@(
     @{Path='Software\Microsoft\Windows\CurrentVersion\Run';Name='WandouPreviewRefresh';Value=('"'+$imageExe+'" --refresh-associations')},
+    @{Path='Software\Microsoft\Windows\CurrentVersion\Uninstall\WandouPreview';Name='DisplayName';Value='豌豆预览'},
+    @{Path='Software\Microsoft\Windows\CurrentVersion\Uninstall\WandouPreview';Name='DisplayVersion';Value='0.2.0'},
+    @{Path='Software\Microsoft\Windows\CurrentVersion\Uninstall\WandouPreview';Name='Publisher';Value='Wandou Preview'},
+    @{Path='Software\Microsoft\Windows\CurrentVersion\Uninstall\WandouPreview';Name='DisplayIcon';Value=(Join-Path $target 'metal-cube.ico')},
+    @{Path='Software\Microsoft\Windows\CurrentVersion\Uninstall\WandouPreview';Name='UninstallString';Value=('"'+(Join-Path $env:WINDIR 'System32\WindowsPowerShell\v1.0\powershell.exe')+'" -NoProfile -ExecutionPolicy Bypass -File "'+(Join-Path $target 'Uninstall.ps1')+'"')},
+    @{Path='Software\Microsoft\Windows\CurrentVersion\Uninstall\WandouPreview';Name='NoModify';Value=1;Kind='DWord'},
+    @{Path='Software\Microsoft\Windows\CurrentVersion\Uninstall\WandouPreview';Name='NoRepair';Value=1;Kind='DWord'},
     @{Path="Software\Classes\CLSID\$modelClsid";Name='';Value='Wandou Preview Thumbnail'},
     @{Path="Software\Classes\CLSID\$modelClsid";Name='DisableProcessIsolation';Value=1;Kind='DWord'},
     @{Path="Software\Classes\CLSID\$modelClsid\InprocServer32";Name='';Value=(Join-Path $target 'ModelThumbnail.dll')},
@@ -134,4 +141,4 @@ Add-Type -TypeDefinition 'using System;using System.Runtime.InteropServices;publ
 Write-Host '豌豆预览 0.2.0 安装完成。' -ForegroundColor Green
 Write-Host '文件夹切换到“大图标”或“超大图标”，即可直接查看模型、视频和 HDR 等缩略图。'
 if($backend){Write-Host "已启用 C4D 保存预览：$backend"}else{Write-Host '未找到 Cinema 4D；FBX、OBJ 等通用模型和 AI 预览仍可使用。' -ForegroundColor Yellow}
-Write-Host '卸载时双击同一文件夹中的 Uninstall.cmd。'
+Write-Host '卸载时请打开 Windows“设置 → 应用 → 已安装的应用”，选择“豌豆预览”。'
