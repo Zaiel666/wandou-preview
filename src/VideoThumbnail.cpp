@@ -25,9 +25,9 @@ extern "C" {
 
 template<class T> static void Release(T*& value){if(value){value->Release();value=nullptr;}}
 
-static bool WriteTopDownBmp(const std::wstring& path,const BYTE* pixels,UINT32 width,UINT32 height){
-    const size_t total=size_t(width)*height*4;BITMAPFILEHEADER fileHeader={};BITMAPINFOHEADER info={};info.biSize=sizeof(info);info.biWidth=LONG(width);info.biHeight=-LONG(height);info.biPlanes=1;info.biBitCount=32;info.biCompression=BI_RGB;info.biSizeImage=DWORD(total);fileHeader.bfType=0x4d42;fileHeader.bfOffBits=sizeof(fileHeader)+sizeof(info);fileHeader.bfSize=fileHeader.bfOffBits+DWORD(total);
-    std::ofstream output(path,std::ios::binary);if(!output)return false;output.write(reinterpret_cast<const char*>(&fileHeader),sizeof(fileHeader));output.write(reinterpret_cast<const char*>(&info),sizeof(info));output.write(reinterpret_cast<const char*>(pixels),total);return bool(output);
+static bool WriteBmp(const std::wstring& path,const BYTE* pixels,UINT32 width,UINT32 height){
+    const size_t rowBytes=size_t(width)*4,total=rowBytes*height;BITMAPFILEHEADER fileHeader={};BITMAPINFOHEADER info={};info.biSize=sizeof(info);info.biWidth=LONG(width);info.biHeight=LONG(height);info.biPlanes=1;info.biBitCount=32;info.biCompression=BI_RGB;info.biSizeImage=DWORD(total);fileHeader.bfType=0x4d42;fileHeader.bfOffBits=sizeof(fileHeader)+sizeof(info);fileHeader.bfSize=fileHeader.bfOffBits+DWORD(total);
+    std::ofstream output(path,std::ios::binary);if(!output)return false;output.write(reinterpret_cast<const char*>(&fileHeader),sizeof(fileHeader));output.write(reinterpret_cast<const char*>(&info),sizeof(info));for(UINT32 y=height;y>0;y--)output.write(reinterpret_cast<const char*>(pixels+size_t(y-1)*rowBytes),rowBytes);return bool(output);
 }
 
 static bool SaveBmp(const std::wstring& path,IMFSample* sample,IMFMediaType* type){
@@ -39,7 +39,7 @@ static bool SaveBmp(const std::wstring& path,IMFSample* sample,IMFMediaType* typ
     }
     if(!copied){BYTE* data=nullptr;DWORD maximum=0,current=0;if(SUCCEEDED(buffer->Lock(&data,&maximum,&current))){LONG stride=LONG(rowBytes);UINT32 stored=0;if(SUCCEEDED(type->GetUINT32(MF_MT_DEFAULT_STRIDE,&stored)))stride=LONG(stored);BYTE* first=stride<0?data+size_t(-stride)*(height-1):data;if(size_t(std::abs(stride))*height<=maximum){for(UINT32 y=0;y<height;y++)memcpy(pixels.data()+size_t(y)*rowBytes,first+ptrdiff_t(y)*stride,rowBytes);copied=true;}buffer->Unlock();}}
     Release(buffer);if(!copied)return false;
-    return WriteTopDownBmp(path,pixels.data(),width,height);
+    return WriteBmp(path,pixels.data(),width,height);
 }
 
 static std::string Utf8(const std::wstring& value){int count=WideCharToMultiByte(CP_UTF8,0,value.c_str(),-1,nullptr,0,nullptr,nullptr);std::string result(std::max(0,count),'\0');if(count>1){WideCharToMultiByte(CP_UTF8,0,value.c_str(),-1,&result[0],count,nullptr,nullptr);result.resize(count-1);}return result;}
@@ -53,7 +53,7 @@ static bool ExtractFrameFfmpeg(const std::wstring& input,const std::wstring& out
     {int64_t target=0;if(stream->duration!=AV_NOPTS_VALUE&&stream->duration>0)target=stream->duration/10;else if(format->duration!=AV_NOPTS_VALUE&&format->duration>0)target=av_rescale_q(format->duration/10,AV_TIME_BASE_Q,stream->time_base);if(target>0){av_seek_frame(format,streamIndex,target,AVSEEK_FLAG_BACKWARD);avcodec_flush_buffers(codec);}}
     packet=av_packet_alloc();frame=av_frame_alloc();if(!packet||!frame)goto done;
     for(int attempts=0;attempts<3000&&av_read_frame(format,packet)>=0;attempts++){
-        if(packet->stream_index==streamIndex&&avcodec_send_packet(codec,packet)>=0){int decoded=avcodec_receive_frame(codec,frame);if(decoded>=0){int longest=std::max(frame->width,frame->height);double scale=longest>768?768.0/longest:1.0;int width=std::max(1,int(frame->width*scale+.5)),height=std::max(1,int(frame->height*scale+.5));std::vector<BYTE> pixels(size_t(width)*height*4);uint8_t* planes[4]={pixels.data(),nullptr,nullptr,nullptr};int strides[4]={width*4,0,0,0};scaler=sws_getContext(frame->width,frame->height,(AVPixelFormat)frame->format,width,height,AV_PIX_FMT_BGRA,SWS_BICUBIC,nullptr,nullptr,nullptr);if(scaler&&sws_scale(scaler,frame->data,frame->linesize,0,frame->height,planes,strides)>0)saved=WriteTopDownBmp(output,pixels.data(),width,height);break;}}
+        if(packet->stream_index==streamIndex&&avcodec_send_packet(codec,packet)>=0){int decoded=avcodec_receive_frame(codec,frame);if(decoded>=0){int longest=std::max(frame->width,frame->height);double scale=longest>768?768.0/longest:1.0;int width=std::max(1,int(frame->width*scale+.5)),height=std::max(1,int(frame->height*scale+.5));std::vector<BYTE> pixels(size_t(width)*height*4);uint8_t* planes[4]={pixels.data(),nullptr,nullptr,nullptr};int strides[4]={width*4,0,0,0};scaler=sws_getContext(frame->width,frame->height,(AVPixelFormat)frame->format,width,height,AV_PIX_FMT_BGRA,SWS_BICUBIC,nullptr,nullptr,nullptr);if(scaler&&sws_scale(scaler,frame->data,frame->linesize,0,frame->height,planes,strides)>0)saved=WriteBmp(output,pixels.data(),width,height);break;}}
         av_packet_unref(packet);
     }
 done:
