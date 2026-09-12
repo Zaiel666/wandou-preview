@@ -1,6 +1,10 @@
 param([string]$Cinema4DPath)
 $ErrorActionPreference='Stop'
 if(-not [Environment]::Is64BitProcess){throw '请使用 64 位 Windows PowerShell。'}
+function Get-WandouHash([string]$Path){
+    $hash=[Security.Cryptography.SHA256]::Create();$stream=[IO.File]::OpenRead($Path)
+    try{return [BitConverter]::ToString($hash.ComputeHash($stream)).Replace('-','')}finally{$stream.Dispose();$hash.Dispose()}
+}
 
 # Remove this project's older registration before installing the renamed product.
 $legacyApp=Join-Path $env:LOCALAPPDATA 'C4DQuickPreview'
@@ -15,7 +19,7 @@ $app=Join-Path $env:LOCALAPPDATA 'WandouPreview'
 # Shell extensions may remain loaded while Explorer is running. Installing each
 # binary build into an immutable directory avoids overwriting a locked DLL and
 # makes upgrades take effect immediately without restarting Windows.
-$payloadHashes=@(Get-ChildItem -LiteralPath $PSScriptRoot -File | Where-Object {$_.Extension -in @('.exe','.dll')} | Sort-Object Name | ForEach-Object {(Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash}) -join ''
+$payloadHashes=@(Get-ChildItem -LiteralPath $PSScriptRoot -File | Where-Object {$_.Extension -in @('.exe','.dll')} | Sort-Object Name | ForEach-Object {Get-WandouHash $_.FullName}) -join ''
 $sha=[Security.Cryptography.SHA256]::Create()
 try{$buildId=([BitConverter]::ToString($sha.ComputeHash([Text.Encoding]::UTF8.GetBytes($payloadHashes))).Replace('-','').Substring(0,12))}finally{$sha.Dispose()}
 $target=Join-Path $app ('0.2.0-'+$buildId)
@@ -47,7 +51,7 @@ $backend=if($candidates.Count){$candidates[0].FullName}else{$null}
 New-Item -ItemType Directory -Force -Path $target | Out-Null
 foreach($from in @(Get-ChildItem -LiteralPath $PSScriptRoot -File | Where-Object {$_.Extension -in @('.exe','.dll','.ico') -or $_.Name -in @('Uninstall.ps1','LICENSE','THIRD-PARTY-NOTICES.md')})){
     $to=Join-Path $target $from.Name
-    if((Test-Path -LiteralPath $to) -and ((Get-FileHash -LiteralPath $from.FullName).Hash -eq (Get-FileHash -LiteralPath $to).Hash)){continue}
+    if((Test-Path -LiteralPath $to) -and ((Get-WandouHash $from.FullName) -eq (Get-WandouHash $to))){continue}
     Copy-Item -LiteralPath $from.FullName -Destination $to -Force
 }
 
