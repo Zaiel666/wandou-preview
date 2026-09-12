@@ -34,7 +34,11 @@ static void ResetView(){g.yaw=35;g.pitch=22;g.zoom=1;g.panX=g.panY=0;}
 
 static bool LoadModel(const std::wstring& path){
     Assimp::Importer importer;
-    const aiScene* scene=importer.ReadFile(Narrow(path),aiProcess_Triangulate|aiProcess_JoinIdenticalVertices|aiProcess_GenSmoothNormals|aiProcess_ImproveCacheLocality|aiProcess_PreTransformVertices|aiProcess_SortByPType|aiProcess_ValidateDataStructure);
+    // Many production FBX files exported by DCC applications contain harmless
+    // structural quirks. Assimp's strict validation rejects those files before
+    // it reaches their otherwise usable mesh data, so thumbnail generation uses
+    // the same tolerant import path that desktop model viewers normally use.
+    const aiScene* scene=importer.ReadFile(Narrow(path),aiProcess_Triangulate|aiProcess_JoinIdenticalVertices|aiProcess_GenSmoothNormals|aiProcess_ImproveCacheLocality|aiProcess_PreTransformVertices|aiProcess_SortByPType);
     if(!scene||!scene->HasMeshes()){g.error=importer.GetErrorString();return false;}
     aiVector3D lo(1e30f),hi(-1e30f);
     for(unsigned m=0;m<scene->mNumMeshes;m++)for(unsigned v=0;v<scene->mMeshes[m]->mNumVertices;v++){auto p=scene->mMeshes[m]->mVertices[v];lo.x=std::min(lo.x,p.x);lo.y=std::min(lo.y,p.y);lo.z=std::min(lo.z,p.z);hi.x=std::max(hi.x,p.x);hi.y=std::max(hi.y,p.y);hi.z=std::max(hi.z,p.z);}
@@ -88,7 +92,7 @@ static HWND MakeWindow(HINSTANCE instance,bool hidden,int size){WNDCLASSEXW wc={
 int WINAPI wWinMain(HINSTANCE instance,HINSTANCE,PWSTR,int){
     int count=0;LPWSTR* args=CommandLineToArgvW(GetCommandLineW(),&count);if(count<5||std::wstring(args[1])!=L"--render"){MessageBoxW(nullptr,L"这是豌豆预览的资源管理器缩略图后台组件。安装后请在文件夹中使用大图标查看模型。",L"豌豆预览 0.2.0",MB_ICONINFORMATION);if(args)LocalFree(args);return 0;}
     g.file=args[2];std::wstring output=args[3];int size=std::max(64,std::min(1024,_wtoi(args[4])));
-    if(!LoadModel(g.file)){LocalFree(args);return 2;}
+    if(!LoadModel(g.file)){std::ofstream errorFile(output,std::ios::binary);errorFile<<g.error;LocalFree(args);return 2;}
     HWND window=MakeWindow(instance,true,size);if(!window){LocalFree(args);return 3;}g.window=window;g.ready=true;wglMakeCurrent(g.dc,g.gl);
     bool ok=SaveBmp(output,size);DestroyWindow(window);LocalFree(args);return ok?0:4;
 }
